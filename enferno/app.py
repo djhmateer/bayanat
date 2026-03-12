@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import pandas as pd
+from urllib.parse import urlparse
 from flask import Flask, render_template, current_app
 from flask_login import user_logged_in, user_logged_out
 from flask_security import Security, SQLAlchemyUserDatastore
@@ -31,7 +32,7 @@ from enferno.admin.models import (
 )
 from enferno.admin.views import admin
 from enferno.data_import.views import imports
-from enferno.extensions import db, session, babel, rds, debug_toolbar, mail, limiter
+from enferno.extensions import db, session, babel, rds, debug_toolbar, mail, limiter, talisman
 from enferno.public.views import bp_public
 from enferno.setup.views import bp_setup
 from enferno.settings import Config
@@ -96,7 +97,9 @@ def register_extensions(app):
         app: Flask application instance
     """
     db.init_app(app)
-    debug_toolbar.init_app(app)
+    # Skip debug toolbar when CSP is enabled (they conflict)
+    if not app.config.get("CSP_ENABLED", False):
+        debug_toolbar.init_app(app)
     user_datastore = SQLAlchemyUserDatastore(db, User, Role, webauthn_model=WebAuthn)
 
     # Initialize security options with common configurations
@@ -122,6 +125,105 @@ def register_extensions(app):
     # Configure limiter storage with the correct config
     limiter.storage_uri = app.config["REDIS_URL"]
     limiter.init_app(app)
+
+    # Initialize Talisman with security headers
+    register_talisman(app)
+
+
+def register_talisman(app):
+    """
+    Register Flask-Talisman for security headers including CSP.
+
+    Args:
+        app: Flask application instance
+    """
+    # Build CSP policy
+    csp = {
+        "default-src": "'self'",
+        "script-src": ["'self'", "'unsafe-eval'"],  # Vue requires it to compile templates
+        "style-src": ["'self'", "'unsafe-inline'"],  # Vuetify requires unsafe-inline for styles
+        "img-src": ["'self'", "data:", "blob:"],
+        "font-src": ["'self'", "data:"],
+        "connect-src": ["'self'"],
+        "media-src": ["'self'", "blob:"],
+        "frame-ancestors": "'none'",
+        "form-action": "'self'",
+        "base-uri": "'self'",
+    }
+
+    # Add map tile servers to img-src and connect-src
+    maps_endpoint = app.config.get("MAPS_API_ENDPOINT", "")
+    _maps_host = urlparse(maps_endpoint).hostname or ""
+    if _maps_host.endswith("openstreetmap.org") or _maps_host.endswith("tile.osm.org"):
+        csp["img-src"].append("https://tile.osm.org")
+        csp["img-src"].append("https://*.tile.osm.org")
+        csp["img-src"].append("https://tile.openstreetmap.org")
+        csp["img-src"].append("https://*.tile.openstreetmap.org")
+        csp["connect-src"].append("https://tile.openstreetmap.org")
+        csp["connect-src"].append("https://*.tile.openstreetmap.org")
+        csp["connect-src"].append("https://tile.osm.org")
+        csp["connect-src"].append("https://*.tile.osm.org")
+
+    # Add Google Maps if configured
+    if app.config.get("GOOGLE_MAPS_API_KEY"):
+        csp["img-src"].extend(
+            [
+                "https://*.google.com",
+                "https://*.googleapis.com",
+                "https://*.gstatic.com",
+            ]
+        )
+        csp["connect-src"].extend(
+            [
+                "https://*.google.com",
+                "https://*.googleapis.com",
+            ]
+        )
+        csp["script-src"].append("https://maps.googleapis.com")
+
+    # Add Google OAuth if enabled
+    if app.config.get("GOOGLE_OAUTH_ENABLED"):
+        csp["connect-src"].append("https://accounts.google.com")
+        csp["img-src"].append("https://accounts.google.com")
+
+    # Add S3 bucket to CSP when using S3 storage
+    if not app.config.get("FILESYSTEM_LOCAL"):
+        s3_region = app.config.get("AWS_REGION", "us-east-1")
+        s3_bucket = app.config.get("S3_BUCKET", "")
+        s3_origins = [
+            f"https://{s3_bucket}.s3.amazonaws.com",
+            f"https://{s3_bucket}.s3.{s3_region}.amazonaws.com",
+        ]
+        for origin in s3_origins:
+            csp["img-src"].append(origin)
+            csp["media-src"].append(origin)
+            csp["connect-src"].append(origin)
+
+    # Check if CSP should be enabled
+    csp_enabled = app.config.get("CSP_ENABLED", True)
+    csp_report_uri = app.config.get("CSP_REPORT_URI")
+    # Report-only mode requires a report URI
+    csp_report_only = app.config.get("CSP_REPORT_ONLY", False) and csp_report_uri
+
+    talisman.init_app(
+        app,
+        # CSP settings
+        content_security_policy=csp if csp_enabled else None,
+        content_security_policy_nonce_in=["script-src"],  # Add nonce to script-src
+        content_security_policy_report_only=csp_report_only,
+        content_security_policy_report_uri=csp_report_uri if csp_report_only else None,
+        # Other security headers
+        force_https=app.config.get("FORCE_HTTPS", False),  # Don't force in dev
+        force_https_permanent=False,
+        frame_options="DENY",
+        strict_transport_security=app.config.get("FORCE_HTTPS", False),
+        strict_transport_security_max_age=31536000,  # 1 year
+        strict_transport_security_include_subdomains=True,
+        strict_transport_security_preload=False,
+        referrer_policy="strict-origin-when-cross-origin",
+        session_cookie_secure=app.config.get("SESSION_COOKIE_SECURE", True),
+        session_cookie_http_only=True,
+    )
 
 
 def register_signals(app):
@@ -237,9 +339,11 @@ def register_commands(app):
     app.cli.add_command(commands.create)
     app.cli.add_command(commands.add_role)
     app.cli.add_command(commands.reset)
+    app.cli.add_command(commands.reset_all_passwords)
     app.cli.add_command(commands.i18n_cli)
     app.cli.add_command(commands.check_db_alignment)
     app.cli.add_command(commands.generate_config)
+    app.cli.add_command(commands.ocr_cli)
 
 
 def register_errorhandlers(app):

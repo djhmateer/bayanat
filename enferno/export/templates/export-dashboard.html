@@ -113,6 +113,10 @@
     <script src="/static/js/components/ActorCard.js"></script>
     <script src="/static/js/components/ReadMore.js"></script>
     <script src="/static/js/components/IncidentCard.js"></script>
+    <script src="/static/js/components/InlineMediaRenderer.js"></script>
+    <script src="/static/js/components/ImageViewer.js"></script>
+    <script src="/static/js/components/PdfViewer.js"></script>
+    <script src="/static/js/components/DocxViewer.js"></script>
 
     <script src="/static/js/components/BulletinResult.js"></script>
     <script src="/static/js/components/ActorResult.js"></script>
@@ -120,14 +124,18 @@
     <script src="/static/js/components/ExportDownload.js"></script>
     <script src="/static/js/components/MissingPersonCard.js"></script>
     <script src="/static/js/components/MediaCard.js"></script>
+    <script src="/static/js/components/MediaThumbnail.js"></script>
     <script src="/static/js/components/RelatedIncidentsCard.js"></script>
     <script src="/static/js/components/RelatedActorsCard.js"></script>
     <script src="/static/js/components/RelatedBulletinsCard.js"></script>
     <script src="/static/js/components/MediaGrid.js"></script>
     <script src="/static/js/components/EventCard.js"></script>
     <script src="/static/js/components/GlobalMap.js"></script>
+    <script src="/static/js/components/EntityFlowMap.js"></script>
+    <script src="/static/js/components/MobilityMap.js"></script>
+    <script src="/static/js/utils/MobilityMapUtils.js"></script>
     <script src="/static/js/components/UniField.js"></script>
-    <script>
+    <script nonce="{{ csp_nonce() }}">
 
         const {createApp} = Vue;
         const {createVuetify} = Vuetify;
@@ -136,7 +144,7 @@
         const app = createApp({
             delimiters: delimiters,
 
-            mixins: [globalMixin, relationsMixin, formBuilderMixin],
+            mixins: [mediaMixin, globalMixin, relationsMixin, formBuilderMixin],
 
             data: () => ({
                 translations: window.translations,
@@ -333,9 +341,16 @@
         app.component('RelatedActorsCard', RelatedActorsCard);
         app.component('RelatedBulletinsCard', RelatedBulletinsCard);
         app.component('MediaCard', MediaCard);
+        app.component('MediaThumbnail', MediaThumbnail);
         app.component('MediaGrid', MediaGrid);
         app.component('EventCard', EventCard);
         app.component('GlobalMap', GlobalMap);
+        app.component('EntityFlowMap', EntityFlowMap);
+        app.component('MobilityMap', MobilityMap);
+        app.component('InlineMediaRenderer', InlineMediaRenderer);
+        app.component('ImageViewer', ImageViewer);
+        app.component('PdfViewer', PdfViewer);
+        app.component('DocxViewer', DocxViewer);
 
         app.use(router);
         app.use(vuetify).mount('#app');
