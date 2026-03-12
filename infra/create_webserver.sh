@@ -116,6 +116,8 @@ WantedBy=multi-user.target
 # there is a uwsgi.ini file in the bayanat directory already
 # had to change to 0.0.0.0 from 127.0.0.1 to access from test server
 sudo systemctl enable --now bayanat.service
+sudo systemctl disable bayanat.service
+sudo systemctl status bayanat.service
 
 
 ## nginx
