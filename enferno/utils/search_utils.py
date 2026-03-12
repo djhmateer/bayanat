@@ -23,11 +23,13 @@ from enferno.admin.models import (
     Dialect,
     ActorProfile,
     Activity,
+    Media,
+    Extraction,
 )
 from enferno.admin.models.DynamicField import DynamicField
 from enferno.user.models import Role
 from enferno.utils.logging_utils import get_logger
-
+from enferno.utils.text_utils import normalize_arabic
 
 logger = get_logger()
 
@@ -73,10 +75,24 @@ class SearchUtils:
     def __init__(self, q=None, cls=None):
         self.search = q
         self.cls = cls
+        self.tsv_words = []  # Store search terms for OCR match detection
+        self._ocr_matched_ids = None  # Cached OCR bulletin IDs from query execution
+
+    def get_ocr_matched_ids(self, bulletin_ids: list) -> set:
+        """
+        Return set of bulletin IDs that matched via OCR text (not bulletin.search).
+        Uses cached results from query execution - no re-query needed.
+        """
+        if self._ocr_matched_ids is None or not bulletin_ids:
+            return set()
+        return self._ocr_matched_ids & set(bulletin_ids)
 
     def get_query(self):
         """Get the query for the given class."""
         if self.cls == "bulletin":
+            # Handle empty search - return all bulletins
+            if not self.search:
+                return select(Bulletin)
             # Get conditions from first query
             main_stmt, conditions = self.bulletin_query(self.search[0])
             final_conditions = conditions
@@ -100,6 +116,9 @@ class SearchUtils:
             return result
 
         elif self.cls == "actor":
+            # Handle empty search - return all actors
+            if not self.search:
+                return select(Actor)
             # Get conditions from first query
             main_stmt, conditions = self.actor_query(self.search[0])
             final_conditions = conditions
@@ -148,6 +167,44 @@ class SearchUtils:
     def build_activity_query(self):
         """Build a query for the activity model."""
         return self.activity_query(self.search)
+
+    def _build_term_conditions(
+        self,
+        column: ColumnElement,
+        terms: list,
+        exact: bool = False,
+        negate: bool = False,
+        normalize: bool = False,
+    ) -> list:
+        """
+        Build search conditions for multi-term text search.
+
+        Args:
+            column: The SQLAlchemy column to search on
+            terms: List of search terms (each treated as a phrase)
+            exact: If True, word boundary match; if False, substring match with wildcards
+            negate: If True, negate conditions (for exclude)
+            normalize: If True, apply Arabic text normalization to terms
+
+        Returns:
+            List of SQLAlchemy conditions
+        """
+        result = []
+        for term in terms:
+            if not term or not term.strip():
+                continue
+
+            term = term.strip()
+            if normalize:
+                term = normalize_arabic(term)
+            if exact:
+                escaped = re.escape(term)
+                cond = column.op("~*")(f"\\y{escaped}\\y")
+            else:
+                cond = column.ilike(f"%{term}%")
+
+            result.append(~cond if negate else cond)
+        return result
 
     def _validate_dynamic_field_name(self, field_name: str, searchable_meta: dict) -> str:
         """
@@ -337,13 +394,37 @@ class SearchUtils:
             conditions.append(Bulletin.id.in_(ids))
 
         # Text search - PERFORMANCE OPTIMIZED
+        # Searches both bulletin fields AND OCR extracted text from attached media
         if tsv := q.get("tsv"):
-            words = tsv.split(" ")
-            # Use individual ILIKE conditions instead of ILIKE ALL() to enable GIN trigram index usage
-            # This changes execution from Sequential Scan to Bitmap Index Scan (200x faster)
-            word_conditions = [Bulletin.search.ilike(f"%{word}%") for word in words if word.strip()]
-            if word_conditions:
-                conditions.extend(word_conditions)
+            words = [w for w in tsv.split(" ") if w.strip()]
+            if words:
+                # Store for OCR match detection (used by get_ocr_matched_ids)
+                self.tsv_words = words
+                # Fast path: bulletin.search - individual ILIKEs enable GIN trigram index (200x faster)
+                bulletin_conditions = [Bulletin.search.ilike(f"%{word}%") for word in words]
+
+                # Execute OCR query once and cache matching bulletin IDs
+                # This avoids running the expensive ILIKE scan as a subquery inside OR
+                ocr_query = (
+                    select(Media.bulletin_id)
+                    .join(Extraction, Media.id == Extraction.media_id)
+                    .where(Extraction.search_text.isnot(None))
+                )
+                for word in words:
+                    ocr_query = ocr_query.where(
+                        Extraction.search_text.ilike(f"%{normalize_arabic(word)}%")
+                    )
+                result = db.session.execute(ocr_query)
+                self._ocr_matched_ids = {row[0] for row in result}
+
+                # Combine: bulletin text match OR cached OCR ID list
+                # Using IN(list) instead of IN(subquery) lets PG use simple pk lookup
+                if self._ocr_matched_ids:
+                    conditions.append(
+                        or_(and_(*bulletin_conditions), Bulletin.id.in_(self._ocr_matched_ids))
+                    )
+                else:
+                    conditions.extend(bulletin_conditions)
 
         # exclude  filter - OPTIMIZED APPROACH using raw SQL
         extsv = q.get("extsv")
@@ -362,6 +443,23 @@ class SearchUtils:
                 raw_condition = raw_condition.bindparams(**params)
 
                 conditions.append(raw_condition)
+
+        # OCR text search - search ONLY in extracted text from media (dedicated filter)
+        if ocr := q.get("ocr"):
+            words = [w for w in ocr.split(" ") if w.strip()]
+            if words:
+                ocr_conds = self._build_term_conditions(
+                    Extraction.search_text, words, normalize=True
+                )
+                if ocr_conds:
+                    ocr_subquery = (
+                        select(Media.bulletin_id)
+                        .join(Extraction, Media.id == Extraction.media_id)
+                        .where(Extraction.search_text.isnot(None))
+                    )
+                    for cond in ocr_conds:
+                        ocr_subquery = ocr_subquery.where(cond)
+                    conditions.append(Bulletin.id.in_(ocr_subquery))
 
         # Origin ID
         originid = (q.get("originid") or "").strip()
@@ -407,6 +505,38 @@ class SearchUtils:
                 conditions.append(or_(*tag_conditions))
             else:
                 conditions.append(and_(*tag_conditions))
+
+        # Search Terms - chips-based multi-term text search
+        # Searches both bulletin fields AND OCR extracted text from attached media
+        if search_terms := q.get("searchTerms"):
+            exact = q.get("termsExact", False)
+            bulletin_conds = self._build_term_conditions(Bulletin.search, search_terms, exact)
+            ocr_conds = self._build_term_conditions(
+                Extraction.search_text, search_terms, exact, normalize=True
+            )
+            if bulletin_conds:
+                ocr_base = (
+                    select(Media.bulletin_id)
+                    .join(Extraction, Media.id == Extraction.media_id)
+                    .where(Extraction.search_text.isnot(None))
+                )
+                if q.get("opTerms", False):
+                    ocr_sub = ocr_base.where(or_(*ocr_conds))
+                    conditions.append(or_(*bulletin_conds, Bulletin.id.in_(ocr_sub)))
+                else:
+                    for b_cond, o_cond in zip(bulletin_conds, ocr_conds):
+                        ocr_sub = ocr_base.where(o_cond)
+                        conditions.append(or_(b_cond, Bulletin.id.in_(ocr_sub)))
+
+        # Exclude Search Terms
+        if ex_terms := q.get("exTerms"):
+            exact = q.get("exTermsExact", False)
+            ex_conds = self._build_term_conditions(Bulletin.search, ex_terms, exact, negate=True)
+            if ex_conds:
+                if q.get("opExTerms", False):
+                    conditions.append(or_(*ex_conds))
+                else:
+                    conditions.extend(ex_conds)
 
         # Labels
         if labels := q.get("labels", []):
@@ -606,18 +736,7 @@ class SearchUtils:
 
             conditions.append(or_(*geo_conditions))
 
-        # Use CTE to get matching IDs first
-        matching_ids = (
-            select(Bulletin.id)
-            .where(and_(*conditions))
-            .order_by(Bulletin.id.desc())
-            .cte("matching_ids")
-        )
-
-        # Join with full bulletin data
-        stmt = select(Bulletin).join(matching_ids, Bulletin.id == matching_ids.c.id)
-
-        return stmt, conditions
+        return select(Bulletin), conditions
 
     def actor_query(self, q: dict):
         """Build a select statement for actor search"""
@@ -641,7 +760,12 @@ class SearchUtils:
                         )
                     )
 
-                subquery = select(Actor.id).join(Actor.actor_profiles).where(and_(*qsearch))
+                # Use explicit join to avoid backref lazy initialization issues
+                subquery = (
+                    select(Actor.id)
+                    .join(ActorProfile, ActorProfile.actor_id == Actor.id)
+                    .where(and_(*qsearch))
+                )
                 conditions.append(Actor.id.in_(subquery))
         # Exclude text search
         if extsv := q.get("extsv"):
@@ -684,6 +808,74 @@ class SearchUtils:
                             .where(or_(*exclude_conditions))
                         )
                         conditions.append(~Actor.id.in_(subquery))
+
+        # Search Terms - chips-based multi-term text search (searches both Actor and ActorProfile)
+        if search_terms := q.get("searchTerms"):
+            exact = q.get("termsExact", False)
+            term_conds = []
+            for term in search_terms:
+                if not term or not term.strip():
+                    continue
+                term = term.strip()
+                if exact:
+                    escaped = re.escape(term)
+                    term_conds.append(
+                        or_(
+                            Actor.search.op("~*")(f"\\y{escaped}\\y"),
+                            ActorProfile.search.op("~*")(f"\\y{escaped}\\y"),
+                        )
+                    )
+                else:
+                    term_conds.append(
+                        or_(
+                            Actor.search.ilike(f"%{term}%"),
+                            ActorProfile.search.ilike(f"%{term}%"),
+                        )
+                    )
+            if term_conds:
+                if q.get("opTerms", False):
+                    # OR: match any term
+                    subquery = select(Actor.id).join(Actor.actor_profiles).where(or_(*term_conds))
+                else:
+                    # AND: match all terms (default)
+                    subquery = select(Actor.id).join(Actor.actor_profiles).where(and_(*term_conds))
+                conditions.append(Actor.id.in_(subquery))
+
+        # Exclude Search Terms (searches both Actor and ActorProfile)
+        if ex_terms := q.get("exTerms"):
+            exact = q.get("exTermsExact", False)
+            ex_conds = []
+            for term in ex_terms:
+                if not term or not term.strip():
+                    continue
+                term = term.strip()
+                if exact:
+                    escaped = re.escape(term)
+                    ex_conds.append(
+                        or_(
+                            Actor.search.op("~*")(f"\\y{escaped}\\y"),
+                            ActorProfile.search.op("~*")(f"\\y{escaped}\\y"),
+                        )
+                    )
+                else:
+                    ex_conds.append(
+                        or_(
+                            Actor.search.ilike(f"%{term}%"),
+                            ActorProfile.search.ilike(f"%{term}%"),
+                        )
+                    )
+            if ex_conds:
+                if q.get("opExTerms", False):
+                    # OR: exclude if matches any term
+                    exclude_subquery = (
+                        select(Actor.id).join(Actor.actor_profiles).where(or_(*ex_conds))
+                    )
+                else:
+                    # AND: exclude if matches all terms (default)
+                    exclude_subquery = (
+                        select(Actor.id).join(Actor.actor_profiles).where(and_(*ex_conds))
+                    )
+                conditions.append(~Actor.id.in_(exclude_subquery))
 
         # Origin ID
         originid = (q.get("originid") or "").strip()
@@ -1116,15 +1308,7 @@ class SearchUtils:
                 ids = [a.actor_id for a in incident.actor_relations]
                 conditions.append(Actor.id.in_(ids))
 
-        # Use CTE to get matching IDs first
-        matching_ids = (
-            select(Actor.id).where(and_(*conditions)).order_by(Actor.id.desc()).cte("matching_ids")
-        )
-
-        # Join with full actor data
-        stmt = select(Actor).join(matching_ids, Actor.id == matching_ids.c.id)
-
-        return stmt, conditions
+        return select(Actor), conditions
 
     def incident_query(self, q: dict):
         """Build a select statement for incident search"""
@@ -1155,6 +1339,26 @@ class SearchUtils:
             if exclude_conditions:
                 exclude_subquery = select(Incident.id).where(or_(*exclude_conditions))
                 conditions.append(~Incident.id.in_(exclude_subquery))
+
+        # Search Terms - chips-based multi-term text search
+        if search_terms := q.get("searchTerms"):
+            exact = q.get("termsExact", False)
+            term_conds = self._build_term_conditions(Incident.search, search_terms, exact)
+            if term_conds:
+                if q.get("opTerms", False):
+                    conditions.append(or_(*term_conds))
+                else:
+                    conditions.extend(term_conds)
+
+        # Exclude Search Terms
+        if ex_terms := q.get("exTerms"):
+            exact = q.get("exTermsExact", False)
+            ex_conds = self._build_term_conditions(Incident.search, ex_terms, exact, negate=True)
+            if ex_conds:
+                if q.get("opExTerms", False):
+                    conditions.append(or_(*ex_conds))
+                else:
+                    conditions.extend(ex_conds)
 
         # Labels
         if labels := q.get("labels", []):
@@ -1302,18 +1506,7 @@ class SearchUtils:
                 ids = [i.get_other_id(incident.id) for i in incident.incident_relations]
                 conditions.append(Incident.id.in_(ids))
 
-        # Use CTE to get matching IDs first
-        matching_ids = (
-            select(Incident.id)
-            .where(and_(*conditions))
-            .order_by(Incident.id.desc())
-            .cte("matching_ids")
-        )
-
-        # Join with full incident data
-        stmt = select(Incident).join(matching_ids, Incident.id == matching_ids.c.id)
-
-        return stmt, conditions
+        return select(Incident), conditions
 
     def location_query(self, q: dict) -> list:
         """

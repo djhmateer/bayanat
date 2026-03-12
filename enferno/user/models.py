@@ -3,7 +3,7 @@ from typing import Any, Dict
 from datetime import datetime
 from uuid import uuid4
 
-from flask import current_app, session, has_app_context
+from flask import current_app, session, has_app_context, has_request_context
 from flask_security import UserMixin, RoleMixin
 from flask_security import current_user
 from flask_security.utils import hash_password
@@ -264,42 +264,36 @@ class User(UserMixin, db.Model, BaseMixin):
 
     @property
     def secure_email(self):
-        try:
-            if (
-                current_user.view_usernames
-                or current_user.has_role("Admin")
-                or current_user is None
-            ):
-                return self.email
-        except Exception as ex:
-            pass
+        if not has_request_context():
+            return self.email
+        if current_user.view_usernames or current_user.has_role("Admin"):
+            return self.email
         return f"user-{self.id}"
 
     @property
     def secure_name(self):
-        try:
-            if (
-                current_user.view_usernames
-                or current_user.has_role("Admin")
-                or current_user is None
-            ):
-                return self.name
-        except Exception as ex:
-            pass
+        if not has_request_context():
+            return self.name
+        if current_user.view_usernames or current_user.has_role("Admin"):
+            return self.name
         return f"user-{self.id}"
 
     @property
     def secure_username(self):
-        try:
-            if (
-                current_user.view_usernames
-                or current_user.has_role("Admin")
-                or current_user is None
-            ):
-                return self.username
-        except Exception as ex:
-            pass
+        if not has_request_context():
+            return self.username
+        if current_user.view_usernames or current_user.has_role("Admin"):
+            return self.username
         return f"user-{self.id}"
+
+    @property
+    def display_name(self):
+        """Return name with username in parentheses for disambiguation in dropdowns."""
+        name = self.secure_name
+        username = self.secure_username
+        if username and username != name:
+            return f"{name} ({username})"
+        return name
 
     def can_access(self, obj: Any) -> bool:
         """
@@ -431,6 +425,7 @@ class User(UserMixin, db.Model, BaseMixin):
             "id": self.id,
             "name": self.secure_name,
             "username": self.secure_username,
+            "display_name": self.display_name,
             "active": self.active,
         }
 
@@ -444,6 +439,7 @@ class User(UserMixin, db.Model, BaseMixin):
             "google_id": self.google_id,
             "email": self.secure_email,
             "username": self.secure_username,
+            "display_name": self.display_name,
             "active": self.active,
             "roles": [role.to_dict() for role in self.roles],
             "view_usernames": self.view_usernames,

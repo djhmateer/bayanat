@@ -70,7 +70,7 @@ class Config(object):
     SECURITY_CHANGEABLE = True
     SECURITY_SEND_PASSWORD_CHANGE_EMAIL = False
     SECURITY_TRACKABLE = True
-    SECURITY_PASSWORD_HASH = "bcrypt"
+    SECURITY_PASSWORD_HASH = "argon2"
     SECURITY_PASSWORD_SALT = os.environ.get("SECURITY_PASSWORD_SALT")
     SECURITY_POST_LOGIN_VIEW = "/dashboard/"
     SECURITY_POST_CONFIRM_VIEW = "/dashboard/"
@@ -178,10 +178,17 @@ class Config(object):
     # Valid video extension list (will be processed during ETL)
     ETL_VID_EXT = manager.get_config("ETL_VID_EXT")
 
-    # valid image extenstions supported by Tesseract OCR
     OCR_ENABLED = manager.get_config("OCR_ENABLED")
     OCR_EXT = manager.get_config("OCR_EXT")
     TESSERACT_CMD = os.environ.get("TESSERACT_CMD", "/usr/bin/tesseract")
+    GOOGLE_VISION_API_KEY = os.environ.get("GOOGLE_VISION_API_KEY") or manager.get_config(
+        "GOOGLE_VISION_API_KEY"
+    )
+    OCR_PROVIDER = os.environ.get("OCR_PROVIDER") or manager.get_config("OCR_PROVIDER")
+    PDF_OCR_MAX_PAGES = int(os.environ.get("PDF_OCR_MAX_PAGES", 20))
+    LLM_OCR_URL = os.environ.get("LLM_OCR_URL") or manager.get_config("LLM_OCR_URL")
+    LLM_OCR_MODEL = os.environ.get("LLM_OCR_MODEL") or manager.get_config("LLM_OCR_MODEL")
+    LLM_OCR_API_KEY = os.environ.get("LLM_OCR_API_KEY") or manager.get_config("LLM_OCR_API_KEY")
 
     # S3 settings
     # Bucket needs to be private with public access blocked
@@ -254,6 +261,14 @@ class Config(object):
         "httponly": False,
         "secure": os.environ.get("SECURE_COOKIES", "True") == "True",
     }
+    # Content Security Policy
+    # Disabled by default until nonces are added to inline scripts in templates
+    CSP_ENABLED = os.environ.get("CSP_ENABLED", "False").lower() == "true"
+    # Report-only mode requires CSP_REPORT_URI to be set
+    CSP_REPORT_ONLY = os.environ.get("CSP_REPORT_ONLY", "False").lower() == "true"
+    CSP_REPORT_URI = os.environ.get("CSP_REPORT_URI", None)
+    FORCE_HTTPS = os.environ.get("FORCE_HTTPS", "False").lower() == "true"
+
     # logging
     APP_LOG_ENABLED = os.environ.get("APP_LOG_ENABLED", "True").lower() == "true"
     CELERY_LOG_ENABLED = os.environ.get("CELERY_LOG_ENABLED", "True").lower() == "true"
@@ -375,7 +390,7 @@ class TestConfig:
     SECURITY_CHANGEABLE = True
     SECURITY_SEND_PASSWORD_CHANGE_EMAIL = False
     SECURITY_TRACKABLE = True
-    SECURITY_PASSWORD_HASH = "bcrypt"
+    SECURITY_PASSWORD_HASH = "argon2"
     SECURITY_PASSWORD_SALT = os.environ.get("SECURITY_PASSWORD_SALT", "test-salt")
     SECURITY_POST_LOGIN_VIEW = "/dashboard/"
     SECURITY_POST_CONFIRM_VIEW = "/dashboard/"
@@ -519,8 +534,14 @@ class TestConfig:
 
     # OCR Settings
     OCR_ENABLED = False
-    OCR_EXT = ["png", "jpeg", "tiff", "jpg", "gif", "webp", "bmp", "pnm"]
+    OCR_EXT = ["png", "jpeg", "tiff", "jpg", "gif", "webp", "bmp", "pnm", "pdf", "docx"]
     TESSERACT_CMD = "/usr/bin/tesseract"
+    GOOGLE_VISION_API_KEY = "dummy_vision_api_key_for_testing"
+    OCR_PROVIDER = "google_vision"
+    PDF_OCR_MAX_PAGES = 20
+    LLM_OCR_URL = "http://localhost:11434"
+    LLM_OCR_MODEL = "llava"
+    LLM_OCR_API_KEY = ""
 
     # Geo & Maps
     GEO_MAP_DEFAULT_CENTER_LAT = 33.510414
@@ -595,6 +616,12 @@ class TestConfig:
         "httponly": False,
         "secure": False,  # Disabled for test HTTP
     }
+
+    # Content Security Policy (disabled for tests)
+    CSP_ENABLED = False
+    CSP_REPORT_ONLY = True
+    CSP_REPORT_URI = None
+    FORCE_HTTPS = False
 
     # Logging
     APP_LOG_ENABLED = False  # Disabled for tests

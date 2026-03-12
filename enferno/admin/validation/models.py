@@ -825,6 +825,9 @@ class LabelValidationModel(StrictValidationModel):
     id: Optional[int] = None
     order: Optional[int] = None
     updated_at: Optional[str] = None
+    # sent by tree view edit (build_tree node shape), not used by from_json
+    parent_label_id: Optional[int] = None
+    children: Optional[List] = None
 
 
 class LabelRequestModel(BaseValidationModel):
@@ -1156,6 +1159,7 @@ class PartialEventTypeModel(BaseValidationModel):
 class QueryBaseModel(StrictValidationModel):
     tsv: Optional[str] = None
     extsv: Optional[str] = None
+    ocr: Optional[str] = None  # Search in OCR extracted text from media
     labels: Optional[list[PartialLabelModel]] = Field(default_factory=list)
     oplabels: Optional[bool] = None
     exlabels: Optional[list[PartialLabelModel]] = Field(default_factory=list)
@@ -1247,6 +1251,13 @@ class BulletinQueryValidationModel(QueryBaseModel):
     exTags: Optional[list[str]] = Field(default_factory=list)
     exExact: Optional[bool] = False
     opExTags: Optional[bool] = False
+    # Chips-based multi-term text search
+    searchTerms: Optional[list[str]] = Field(default_factory=list)
+    opTerms: Optional[bool] = False
+    termsExact: Optional[bool] = False
+    exTerms: Optional[list[str]] = Field(default_factory=list)
+    opExTerms: Optional[bool] = False
+    exTermsExact: Optional[bool] = False
     childlabels: Optional[bool] = False
     childverlabels: Optional[bool] = False
     childsources: Optional[bool] = False
@@ -1391,6 +1402,13 @@ class ActorQueryModel(QueryBaseModel):
     exTags: Optional[list[str]] = Field(default_factory=list)
     exExact: Optional[bool] = False
     opExTags: Optional[bool] = False
+    # Chips-based multi-term text search
+    searchTerms: Optional[list[str]] = Field(default_factory=list)
+    opTerms: Optional[bool] = False
+    termsExact: Optional[bool] = False
+    exTerms: Optional[list[str]] = Field(default_factory=list)
+    opExTerms: Optional[bool] = False
+    exTermsExact: Optional[bool] = False
     opEthno: Optional[bool] = None
     ethnography: list[PartialEthnographyModel] = Field(default_factory=list)
     opNat: Optional[bool] = None
@@ -1466,6 +1484,7 @@ class UserValidationModel(StrictValidationModel):
     force_reset: Optional[str] = None
     google_id: Optional[str] = None
     id: Optional[int] = None
+    display_name: Optional[str] = None
     two_factor_devices: Optional[Any] = None
 
     @field_validator("username", mode="before")
@@ -1553,6 +1572,13 @@ class IncidentQueryModel(QueryBaseModel):
     ids: list[int] = Field(default_factory=list)
     potentialVCats: list[PartialPotentialViolationModel] = Field(default_factory=list)
     claimedVCats: list[PartialClaimedViolationModel] = Field(default_factory=list)
+    # Chips-based multi-term text search
+    searchTerms: Optional[list[str]] = Field(default_factory=list)
+    opTerms: Optional[bool] = False
+    termsExact: Optional[bool] = False
+    exTerms: Optional[list[str]] = Field(default_factory=list)
+    opExTerms: Optional[bool] = False
+    exTermsExact: Optional[bool] = False
     # Minimal, permissive container for dynamic-field filters
     # Example item: {"name": "field_123", "op": "contains", "value": "test"}
     dyn: Optional[list[dict]] = Field(default_factory=list)
@@ -1585,6 +1611,18 @@ class QueryValidationModel(BaseValidationModel):
 
 class GraphVisualizeRequestModel(BaseValidationModel):
     q: list[dict[str, Any]] | dict[str, Any]
+
+
+class FlowmapVisualizeRequestModel(BaseValidationModel):
+    q: list[dict[str, Any]]
+
+
+class FlowmapActorsForLocationsModel(BaseValidationModel):
+    location_ids: Optional[list[int]] = None
+    origin_ids: Optional[list[int]] = None
+    dest_ids: Optional[list[int]] = None
+    q: list[dict[str, Any]]
+    event_types: Optional[list[str]] = None
 
 
 class DefaultMapCenterModel(BaseValidationModel):
@@ -1637,6 +1675,7 @@ class ConfigValidationModel(StrictValidationModel):
     EXPORT_DEFAULT_EXPIRY: int = Field(gt=0)
     ACTIVITIES_RETENTION: int = Field(gt=0)
     WEB_IMPORT: bool
+    GOOGLE_VISION_API_KEY: Optional[str] = None
 
     @field_validator("MAPS_API_ENDPOINT", "GOOGLE_DISCOVERY_URL", mode="before", check_fields=False)
     @classmethod
