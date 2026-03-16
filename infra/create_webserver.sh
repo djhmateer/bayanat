@@ -102,6 +102,27 @@ uv run flask run --host=0.0.0.0
 
 # http://192.168.1.179:91/setup_wizard
 
+## DELETE DB and start again
+# logged in as dave
+sudo -u postgres psql -c "DROP DATABASE bayanat;"
+sudo -u postgres createdb -O bayanat bayanat
+sudo -u postgres psql -d bayanat -c "CREATE EXTENSION IF NOT EXISTS postgis;"
+sudo -u postgres psql -d bayanat -c "CREATE EXTENSION IF NOT EXISTS pg_trgm;"
+
+sudo -u bayanat -i bash -c "cd /bayanat"
+uv run flask create-db
+
+# do I need this? does setup_wizard do it?
+# uv run flask import-data
+
+# just creates an admin user
+# admin, zp..22!!
+# uv run flask install
+
+# setup_complete to false
+vim config.json
+
+uv run flask run --host=0.0.0.0
 
 
 
