@@ -30,3 +30,4 @@ backups/*
 cookies.txt
 
 *.egg-info/
+secrets/

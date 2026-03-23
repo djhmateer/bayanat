@@ -28,7 +28,7 @@
 #     ffmpeg \
 #     redis-server
 
-sudo apt install -y python3-dev libpq-dev redis-server postgresql postgresql-contrib postgis libgdal-dev uwsgi
+sudo apt install -y python3-dev libpq-dev redis-server postgresql postgresql-contrib postgis libgdal-dev uwsgi libimage-exiftool-perl
 
 
 # https://tesseract-ocr.github.io/tessdoc/Installation.html
@@ -57,6 +57,14 @@ sudo -u postgres createdb -O bayanat bayanat
 sudo -u postgres psql -d bayanat -c "CREATE EXTENSION IF NOT EXISTS postgis;"
 sudo -u postgres psql -d bayanat -c "CREATE EXTENSION IF NOT EXISTS pg_trgm;"
 
+# DEV DB
+PGPASSWORD='password' psql -U bob
+CREATE DATABASE bayanat;
+# connect to bayanat db
+\c bayanat
+CREATE EXTENSION IF NOT EXISTS postgis;
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+# END DEV DB
 
 sudo mkdir /bayanat/
 sudo chown bayanat:bayanat /bayanat
@@ -69,7 +77,9 @@ cd /bayanat
 # git clone https://github.com/sjacorg/bayanat.git /bayanat/
 git clone https://github.com/djhmateer/bayanat.git /bayanat/
 
-# install uv
+# install uv.. 
+# same command to update
+# 0.10.11 on 17th Mar 2026
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
 source $HOME/.local/bin/env
@@ -86,12 +96,23 @@ uv sync --extra ai
 # just creates .env file from .env-sample
 bash gen-env.sh
 
-# HERE said to run uv run flask install.. but failed
-uv run flask create-db  
-uv run flask install
+#DEV
+POSTGRES_USER=bob
+POSTGRES_PASSWORD=password 
+#END DEV
 
+uv run flask create-db  
+
+# creates admin user - can just do this in flask run next
+# uv run flask install
+
+# DEV
+config.json - web setup to false
 # spins up on http://127.0.0.1:5000
 uv run flask run
+
+uv run python sample_data/sample_data_minimal_reset.py    
+# END DEV
 
 # I had to put in SECURE_COOKIES=False into the .env so didn't get error about csrf tokens not matching
 
@@ -109,7 +130,7 @@ sudo -u postgres createdb -O bayanat bayanat
 sudo -u postgres psql -d bayanat -c "CREATE EXTENSION IF NOT EXISTS postgis;"
 sudo -u postgres psql -d bayanat -c "CREATE EXTENSION IF NOT EXISTS pg_trgm;"
 
-sudo -u bayanat -i bash -c "cd /bayanat"
+sudo -u bayanat -i 
 uv run flask create-db
 
 # do I need this? does setup_wizard do it?
@@ -122,6 +143,8 @@ uv run flask create-db
 # setup_complete to false
 vim config.json
 
+sudo -u bayanat -i 
+cd /bayanat
 uv run flask run --host=0.0.0.0
 
 
@@ -216,16 +239,10 @@ WantedBy=multi-user.target
 sudo systemctl enable --now bayanat-celery.service
 
 
-
-
-
-
-
-
 ## TO RECREATE
 # as user dave or a priv user
 
-  # Drop and recreate the database
+# Drop and recreate the database
 sudo -u bayanat dropdb bayanat
 sudo -u bayanat createdb bayanat
 sudo -u postgres psql -d bayanat -c 'CREATE EXTENSION if not exists pg_trgm; CREATE EXTENSION if not exists postgis;'
@@ -236,7 +253,6 @@ sudo su -l bayanat
 # recreate the db
 export FLASK_APP=run.py
 uv run flask create-db
-
 
 # step4 - do it manually
 uv run flask import-data

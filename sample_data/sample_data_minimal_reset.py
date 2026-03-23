@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-sample_data/demo_data_minimal_reset.py
+sample_data/sample_data_minimal_reset.py
 =======================================
 Minimal demo data seeder for Bayanat — always resets to a clean state.
 
@@ -23,7 +23,7 @@ open-source evidence.  Actor "Thomas Ashdown" is identified in the image.
 
 USAGE
 ─────
-    uv run python sample_data/demo_data_minimal_reset.py
+    uv run python sample_data/sample_data_minimal_reset.py
 
 Must be run from the project root with the virtual environment active.
 The Flask app context is created automatically by the __main__ block.
@@ -98,8 +98,10 @@ WHAT THIS SCRIPT DOES (in order)
    Labels          13  7 verified (neutral, evidence-based) +
                        6 unverified (descriptive, allegation-based)
    Actors           1  Fictional: "Thomas Ashdown" — photographed in crowd
-   Bulletins        1  "Crowd gathered at Lewes Castle" — X post, with
-                       labels, verified labels, tags, event, map pin
+   Bulletins        5  X post, Facebook caption, Instagram caption, TikTok
+                       caption, eyewitness statement (Margaret Okafor) —
+                       each with labels, verified labels, tags;
+                       X post also has event and map pin
    Incident         1  "Siege of Lewes Castle (17 March 2026)"
    Atob link        1  Ashdown ↔ bulletin (Appeared)
    Itob link        1  Incident ↔ bulletin (Primary Evidence)
@@ -387,7 +389,7 @@ def clear_all_content():
         "incident_potential_violations", "incident_claimed_violations",
         "event",                                                    # events
         "bulletin", "actor", "incident",                            # main entities
-        "location", "source",                                       # supporting
+        "location", "source", "label",                              # supporting
     ]
 
     db.session.execute(text(
@@ -403,15 +405,15 @@ def clear_all_content():
 def seed_minimal():
     """Seed the Lewes Castle siege scenario: 1 incident, 1 bulletin, 1 actor."""
 
-    admin = User.query.first()
+    from enferno.user.models import Role
+    admin = User.query.join(User.roles).filter(Role.name == "Admin").first()
     if not admin:
-        print("Error: No users found. Run 'flask install' first.")
+        print("Error: No admin user found. Run 'flask install' first.")
         return False
 
     print("Seeding minimal demo data...")
 
     # ── Test users ──────────────────────────────────────────────────
-    from enferno.user.models import Role
     da_role = Role.query.filter_by(name="DA").first()
 
     # Delete all non-admin users so we start fresh each run
@@ -473,6 +475,7 @@ def seed_minimal():
         "Facebook",
         "YouTube",
         "Witness Statement",
+        "TikTok",
     ]
     sources = {}
     for title in source_titles:
@@ -616,8 +619,10 @@ def seed_minimal():
 
     # ── Bulletin ────────────────────────────────────────────────────
     b = Bulletin()
-    b.title = "Crowd gathered at Lewes Castle gate"
-    b.sjac_title = "X post showing crowd at Lewes Castle - 17 Mar 2026"
+    # title: original source wording (the tweet text as posted)
+    b.title = "Unbelievable scenes at Lewes Castle right now. Hundreds here. #LewesCastle"
+    # sjac_title: analyst's normalised title
+    b.sjac_title = "X post: crowd gathered at Lewes Castle gate - 17 Mar 2026"
     b.description = (
         "Image posted to X (formerly Twitter) by @lewes_observer at 14:22 GMT "
         "on 17 March 2026. Shows approximately 200 people gathered at the "
@@ -625,10 +630,18 @@ def seed_minimal():
         "placards. Smoke visible in the background near the castle keep. "
         "Post received 4,300 retweets before the account was suspended."
     )
+    b.originid = "1234567890"       # tweet ID extracted from source URL
     b.source_link = "https://x.com/lewes_observer/status/1234567890"
     b.publish_date = _dt(2026, 3, 17, 14, 22)
     b.documentation_date = _dt(2026, 3, 17, 16, 0)
+    b.reliability_score = 40        # unverified account; no corroboration yet
+    b.comments = (
+        "Source account @lewes_observer has no prior history. Image metadata "
+        "not yet verified. Account was suspended shortly after posting — "
+        "screenshot preserved as evidence. Awaiting corroboration from news sources."
+    )
     b.status = status_assigned
+    b.user_id = admin.id
     b.assigned_to_id = user1.id
     b.tags = [
         "Lewes", "castle siege", "protest", "crowd", "X post",
@@ -682,6 +695,203 @@ def seed_minimal():
     db.session.flush()
     b.events.append(evt)
 
+    # ── Facebook bulletin ───────────────────────────────────────────
+    b_fb = Bulletin()
+    # title: the caption as posted on Facebook
+    b_fb.title = (
+        "Just drove past Lewes Castle and there are hundreds of people outside! "
+        "Never seen anything like it. Police everywhere. Stay safe everyone ❤️ "
+        "#Lewes #LewesCastle"
+    )
+    b_fb.sjac_title = "Facebook post: eyewitness reports crowd at Lewes Castle - 17 Mar 2026"
+    b_fb.description = (
+        "Public Facebook post by user 'Sandra Brightwell' at 14:35 GMT on "
+        "17 March 2026. Post accompanied by a photograph taken from a car window "
+        "showing police vehicles and a large crowd on the approach road to "
+        "Lewes Castle. Post received 312 shares and 890 reactions before the "
+        "account was set to private."
+    )
+    b_fb.originid = "FB-10158234567890"
+    b_fb.source_link = "https://www.facebook.com/permalink.php?story_fbid=10158234567890"
+    b_fb.publish_date = _dt(2026, 3, 17, 14, 35)
+    b_fb.documentation_date = _dt(2026, 3, 17, 17, 30)
+    b_fb.reliability_score = 50
+    b_fb.comments = (
+        "Account appears to be a genuine local resident based on post history. "
+        "Photograph shows police vehicles consistent with a major incident response. "
+        "Account set to private shortly after — screenshot and metadata preserved."
+    )
+    b_fb.status = status_assigned
+    b_fb.user_id = admin.id
+    b_fb.assigned_to_id = test_users["user2"].id
+    b_fb.tags = ["Lewes", "castle siege", "Facebook", "eyewitness", "crowd", "East Sussex"]
+    db.session.add(b_fb)
+    db.session.flush()
+
+    for key in ["Crowd / Gathering", "Protest / Demonstration"]:
+        lbl = label_map.get(key)
+        if lbl:
+            b_fb.labels.append(lbl)
+    for key in ["Image", "Social Media Post", "Outdoor Scene", "Multiple Persons Visible"]:
+        lbl = label_map.get(key)
+        if lbl:
+            b_fb.ver_labels.append(lbl)
+    b_fb.locations.append(castle)
+    b_fb.sources.append(sources["Facebook"])
+
+    # ── Instagram bulletin ──────────────────────────────────────────
+    b_ig = Bulletin()
+    # title: the Instagram caption as posted
+    b_ig.title = (
+        "History under siege 🏰 Incredible and frightening scenes unfolding right "
+        "now at Lewes Castle. This place has stood for 900 years. "
+        "#LewesCastle #Lewes #EastSussex #protest #history"
+    )
+    b_ig.sjac_title = "Instagram post: photograph of crowd at Lewes Castle barbican - 17 Mar 2026"
+    b_ig.description = (
+        "Public Instagram post by account @historic_lewes at 14:41 GMT on "
+        "17 March 2026. Post contains a single high-resolution photograph taken "
+        "from an elevated position (possibly the adjacent bowling green) showing "
+        "the full scale of the crowd at the barbican entrance. Castle keep visible "
+        "in the background with smoke rising from the east side. "
+        "Post received 2,100 likes and 340 comments before the account was archived."
+    )
+    b_ig.originid = "3012345678901234567"
+    b_ig.source_link = "https://www.instagram.com/p/C4xAbCdEfGh/"
+    b_ig.publish_date = _dt(2026, 3, 17, 14, 41)
+    b_ig.documentation_date = _dt(2026, 3, 17, 18, 0)
+    b_ig.reliability_score = 55
+    b_ig.comments = (
+        "Elevated angle provides better crowd size assessment than ground-level images. "
+        "Smoke visible near east keep — consistent with damage reported in police statement. "
+        "Account @historic_lewes has a prior history of local heritage photography, "
+        "increasing source credibility. Image metadata not yet verified."
+    )
+    b_ig.status = status_assigned
+    b_ig.user_id = admin.id
+    b_ig.assigned_to_id = test_users["user3"].id
+    b_ig.tags = ["Lewes", "castle siege", "Instagram", "aerial view", "smoke", "East Sussex", "heritage"]
+    db.session.add(b_ig)
+    db.session.flush()
+
+    for key in ["Siege / Occupation", "Heritage Site Threatened", "Property Damage Alleged"]:
+        lbl = label_map.get(key)
+        if lbl:
+            b_ig.labels.append(lbl)
+    for key in ["Image", "Social Media Post", "Outdoor Scene", "Multiple Persons Visible",
+                "Historic Structure Visible", "Priority"]:
+        lbl = label_map.get(key)
+        if lbl:
+            b_ig.ver_labels.append(lbl)
+    b_ig.locations.append(castle)
+    b_ig.sources.append(sources["Instagram"])
+
+    # ── TikTok bulletin ─────────────────────────────────────────────
+    b_tt = Bulletin()
+    # title: the TikTok caption as posted (short, hashtag-heavy)
+    b_tt.title = "POV: you're at lewes castle rn 😳 #lewes #lewestok #fyp #castle #siege #uk"
+    b_tt.sjac_title = "TikTok video: interior footage of crowd inside Lewes Castle grounds - 17 Mar 2026"
+    b_tt.description = (
+        "TikTok video posted by account @sussex_daily at 15:04 GMT on "
+        "17 March 2026. 47-second handheld video filmed from inside the castle "
+        "grounds after the barbican gate was breached. Footage shows a large crowd "
+        "moving through the outer ward toward the keep, with audible shouting. "
+        "At 0:23 a section of decorative stonework is visible with fresh damage. "
+        "Video reached 1.4 million views before removal by TikTok at 19:30 GMT. "
+        "Archived copy preserved by documentation team."
+    )
+    b_tt.originid = "7312345678901234567"
+    b_tt.source_link = "https://www.tiktok.com/@sussex_daily/video/7312345678901234567"
+    b_tt.publish_date = _dt(2026, 3, 17, 15, 4)
+    b_tt.documentation_date = _dt(2026, 3, 17, 19, 45)
+    b_tt.reliability_score = 65
+    b_tt.comments = (
+        "Only known video from inside the castle grounds after the breach. "
+        "Stonework damage visible at 0:23 corroborates the curator's statement. "
+        "Video removed by TikTok — archived copy held. Account @sussex_daily "
+        "has 18k followers and a history of local news coverage. "
+        "Geolocation via background landmarks confirmed as inner ward of Lewes Castle."
+    )
+    b_tt.status = status_assigned
+    b_tt.user_id = admin.id
+    b_tt.assigned_to_id = test_users["user1"].id
+    b_tt.tags = ["Lewes", "castle siege", "TikTok", "interior", "video", "breach", "stonework damage"]
+    db.session.add(b_tt)
+    db.session.flush()
+
+    for key in ["Siege / Occupation", "Property Damage Alleged", "Trespass Alleged"]:
+        lbl = label_map.get(key)
+        if lbl:
+            b_tt.labels.append(lbl)
+    for key in ["Social Media Post", "Outdoor Scene", "Multiple Persons Visible",
+                "Historic Structure Visible", "Priority", "Graphic Content"]:
+        lbl = label_map.get(key)
+        if lbl:
+            b_tt.ver_labels.append(lbl)
+    b_tt.locations.append(castle)
+    b_tt.sources.append(sources["TikTok"])
+
+    # ── Eyewitness statement bulletin ──────────────────────────────
+    b_ew = Bulletin()
+    b_ew.title = (
+        "Witness statement — Margaret Okafor, 17 March 2026. "
+        "I was working in the castle ticket office when the crowd arrived."
+    )
+    b_ew.sjac_title = "Witness statement: castle ticket office staff member — 17 Mar 2026"
+    b_ew.description = (
+        "Written statement provided by Margaret Okafor, ticket office supervisor "
+        "at Lewes Castle, taken by Sussex Police on 18 March 2026 (ref: SP-2026-0317-04). "
+        "\n\n"
+        "\"I was on duty in the ticket office at approximately 13:45 when I noticed a "
+        "large number of people gathering outside the barbican gate. There were far more "
+        "than would be typical for a Tuesday afternoon. I estimated two hundred or more. "
+        "Some were carrying placards but I could not read them from my position. "
+        "\n\n"
+        "At around 14:05 the crowd surged forward. The gate, which had been left "
+        "on the latch while a school group was exiting, was pushed open. I immediately "
+        "called 999 and activated the site alarm. I then directed the school group — "
+        "approximately 30 children aged 10-11 and three teachers — through the rear "
+        "fire exit into Albion Street. "
+        "\n\n"
+        "As I was leaving I heard a loud cracking sound from the direction of the keep. "
+        "I did not see what caused it. I did not see Thomas Ashdown personally but was "
+        "shown a photograph by police and confirmed that a man matching his description "
+        "was near the front of the crowd when the gate was breached. "
+        "\n\n"
+        "I have worked at the castle for eleven years and have never seen anything like "
+        "this. The damage to the east wall of the keep was not there when I arrived for "
+        "my shift at 09:00.\""
+    )
+    b_ew.originid = "SP-2026-0317-04"
+    b_ew.publish_date = _dt(2026, 3, 18, 10, 30)
+    b_ew.documentation_date = _dt(2026, 3, 18, 14, 0)
+    b_ew.reliability_score = 80
+    b_ew.comments = (
+        "Primary eyewitness account from a credible source — on-site staff member "
+        "with 11 years at the castle. Statement taken under caution by Sussex Police "
+        "the day after the incident. Key value: confirms the gate breach mechanism, "
+        "the presence of a school group, the timing of the keep damage, and places a "
+        "person matching Ashdown's description at the front of the crowd. "
+        "No corroboration needed — consistent with all other evidence."
+    )
+    b_ew.status = status_assigned
+    b_ew.user_id = admin.id
+    b_ew.assigned_to_id = test_users["user2"].id
+    b_ew.tags = ["Lewes", "witness statement", "castle siege", "gate breach", "keep damage", "police statement"]
+    db.session.add(b_ew)
+    db.session.flush()
+
+    for key in ["Siege / Occupation", "Property Damage Alleged", "Trespass Alleged"]:
+        lbl = label_map.get(key)
+        if lbl:
+            b_ew.labels.append(lbl)
+    for key in ["Priority"]:
+        lbl = label_map.get(key)
+        if lbl:
+            b_ew.ver_labels.append(lbl)
+    b_ew.locations.append(castle)
+    b_ew.sources.append(sources["Witness Statement"])
+
     # ── Actor-to-Bulletin link ──────────────────────────────────────
     atob = Atob(actor_id=a.id, bulletin_id=b.id)
     atob.related_as = [4]  # Appeared
@@ -703,6 +913,15 @@ def seed_minimal():
         "cleared by 18:30 following negotiation. Several arrests were made."
     )
     inc.status = status
+    inc.assigned_to_id = test_users["user2"].id
+    inc.first_peer_reviewer_id = test_users["user3"].id
+    inc.second_peer_reviewer_id = test_users["user1"].id
+    inc.comments = (
+        "Incident confirmed via cross-referencing the X post image with BBC News "
+        "and a police press release. Damage to the Norman keep confirmed by "
+        "a statement issued by Dr. Sarah Mellor, site curator, on 18 March 2026. "
+        "Three arrests confirmed by police. Incident closed and peer reviewed."
+    )
     db.session.add(inc)
     db.session.flush()
 
@@ -747,6 +966,23 @@ def seed_minimal():
     itob.comment = "X post image is the earliest known visual evidence of the crowd."
     itob.user_id = admin.id
     db.session.add(itob)
+
+    # Incident-to-Bulletin links for Facebook, Instagram, TikTok, and eyewitness bulletins
+    for new_b, rel_type, prob, comment in [
+        (b_fb, 3, 60, "Facebook post corroborates police presence and crowd scale."),
+        (b_ig, 3, 75, "Instagram photograph provides best available crowd-size evidence."),
+        (b_tt, 2, 90, "TikTok video is only footage from inside the grounds — shows breach and damage."),
+        (b_ew, 2, 90, "Eyewitness statement confirms gate breach, keep damage, and Ashdown's position."),
+    ]:
+        db.session.add(Itob(
+            incident_id=inc.id,
+            bulletin_id=new_b.id,
+            related_as=rel_type,
+            probability=prob,
+            comment=comment,
+            user_id=admin.id,
+        ))
+    db.session.flush()
 
     # Incident-to-Actor link
     itoa = Itoa(actor_id=a.id, incident_id=inc.id)
@@ -799,7 +1035,12 @@ def seed_minimal():
     print(f"  Sources:    {len(source_titles)} ({', '.join(source_titles)})")
     print(f"  Locations:  3 (East Sussex → Lewes → Lewes Castle)")
     print(f"  Actors:     1 (Thomas Ashdown)")
-    print(f"  Bulletins:  1 (crowd at Lewes Castle) — Assigned to user1")
+    print(f"  Bulletins:  5")
+    print(f"    - X post (assigned user1)")
+    print(f"    - Facebook caption (assigned user2)")
+    print(f"    - Instagram caption (assigned user3)")
+    print(f"    - TikTok caption (assigned user1)")
+    print(f"    - Eyewitness statement / Margaret Okafor (assigned user2)")
     print(f"  Incidents:  1 (Siege of Lewes Castle)")
     print(f"  Media:      1 (castle photo)")
     return True
