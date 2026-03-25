@@ -1065,6 +1065,8 @@
                     bulkStatus() {
 
                         api.get('/admin/api/bulk/status/?type=bulletin').then(res => {
+                            // Fix: use optional chaining + nullish coalescing to avoid TypeError when Celery
+                            // is not running and the API returns null/undefined instead of a jobs array.
                             this.jobs = res?.data?.data ?? [];
 
                             if (!this.jobs.length) {
@@ -1076,7 +1078,7 @@
                                 this.showSnack("{{ _('Bulk Update is finished!')}}")
                             } else {
                                 //console.log(this.jobs)
-                                for (job of this.jobs) {
+                                for (const job of this.jobs) {
                                     // console.log(job.status)
                                 }
                             }

@@ -256,3 +256,27 @@ uv run flask create-db
 
 # step4 - do it manually
 uv run flask import-data
+
+
+## MIGRATIONS
+## on 23rd March I had to run these 5 (notice 1 was missing)
+## careful there is no runner, and migrations are not idempotent
+  ├────────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────────────────────┤                                                           
+  │
+20260217_120000_seed_actor_missing_core_fields.sql │ Seeds sources, labels, ver_labels fields into dynamic_fields for actors       │                                                         
+  ├────────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────────────────────┤                                                           
+  │ 20260302_000000_normalize_search_text_newlines.sql │ Recreates extraction.search_text generated column to handle cross-line search │
+  ├────────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────────────────────┤
+  │ 20260311_000000_add_can_access_media.sql           │ Adds can_access_media column to the user table                                │
+  ├────────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────────────────────┤
+  │ 20260316_000000_fix_deleted_column_not_null.sql    │ Sets NOT NULL + DEFAULT FALSE on deleted across all tables              
+
+
+## DAILY DEV
+
+uv run flask run
+
+uv run python sample_data/sample_data_minimal_reset.py
+
+# so can run bulk updates
+uv run celery -A enferno.tasks worker -B --loglevel=info

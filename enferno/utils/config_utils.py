@@ -122,7 +122,7 @@ class ConfigManager:
             "DEDUP_BATCH_SIZE": 30,
             "DEDUP_INTERVAL": 3,
             "GEO_MAP_DEFAULT_CENTER": {"lat": 33.510414, "lng": 36.278336, "radius": 1000},
-            "ITEMS_PER_PAGE_OPTIONS": [10, 30, 100],
+            "ITEMS_PER_PAGE_OPTIONS": [30, 10, 100],
             "VIDEO_RATES": [0.25, 0.5, 1, 1.5, 2, 4],
             "EXPORT_TOOL": False,
             "EXPORT_DEFAULT_EXPIRY": 2,

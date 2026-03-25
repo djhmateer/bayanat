@@ -91,10 +91,16 @@ WHAT THIS SCRIPT DOES (in order)
 
    Entity       Count  Detail
    ───────────  ─────  ──────────────────────────────────────────────────
-   Sources         10  X (Twitter), BBC News, Sussex Police, The Guardian,
+   Sources         10  X (Twitter), Albion Broadcasting, Lewes & Weald Constabulary, The National Courier,
                        ITV News, Sky News, Instagram, Facebook, YouTube,
                        Witness Statement
-   Locations        3  East Sussex → Lewes → Lewes Castle
+   Locations        9  East Sussex → Lewes → Lewes Castle
+                              → Lewes Crown Court
+                              → Lewes Police Station
+                              → HM Prison Lewes
+                          → Brighton
+                          → Eastbourne
+                          → Hastings
    Labels          13  7 verified (neutral, evidence-based) +
                        6 unverified (descriptive, allegation-based)
    Actors           1  Fictional: "Thomas Ashdown" — photographed in crowd
@@ -118,7 +124,7 @@ from enferno.admin.models import (
     Bulletin, Actor, Incident, Location, Event, Source, Label,
     Eventtype, Country, PotentialViolation, ClaimedViolation,
     LocationAdminLevel, LocationType, GeoLocationType, WorkflowStatus,
-    Atob, Itob, Itoa, Media, GeoLocation,
+    Atob, Atoa, Itob, Itoa, Itoi, Media, GeoLocation,
 )
 from enferno.admin.models.ActorProfile import ActorProfile
 from enferno.admin.models.AtobInfo import AtobInfo
@@ -129,6 +135,7 @@ from enferno.admin.models.ItoaInfo import ItoaInfo
 from enferno.admin.models.ItoiInfo import ItoiInfo
 from enferno.admin.models.MediaCategory import MediaCategory
 from enferno.admin.models.IDNumberType import IDNumberType
+from enferno.admin.models.DynamicField import DynamicField
 from enferno.user.models import User
 from flask_security.utils import hash_password
 
@@ -413,6 +420,31 @@ def seed_minimal():
 
     print("Seeding minimal demo data...")
 
+    # ── OVRM ID custom field ─────────────────────────────────────────
+    # Ensure the "ovrm_id" custom field exists on bulletins. Idempotent.
+    ovrm_field = DynamicField.query.filter_by(name="ovrm_id", entity_type="bulletin").first()
+    if not ovrm_field:
+        ovrm_field = DynamicField(
+            name="ovrm_id",
+            title="OVRM ID",
+            entity_type="bulletin",
+            field_type=DynamicField.TEXT,
+            ui_component=DynamicField.UIComponent.INPUT,
+            schema_config={"max_length": 50},
+            ui_config={"width": "w-50", "help_text": "Ouse Valley Rights Monitor internal reference number"},
+            searchable=True,
+            sort_order=20,
+            core=False,
+            active=True,
+        )
+        db.session.add(ovrm_field)
+        db.session.flush()
+        ovrm_field.create_column()
+        db.session.commit()
+        print("  Created OVRM ID custom field on bulletin")
+    else:
+        print("  OVRM ID custom field already exists")
+
     # ── Test users ──────────────────────────────────────────────────
     da_role = Role.query.filter_by(name="DA").first()
 
@@ -425,9 +457,9 @@ def seed_minimal():
         print(f"  Deleted {len(non_admin_users)} non-admin user(s)")
 
     test_user_defs = [
-        ("user1", "User One",   "user1@demo.local"),
-        ("user2", "User Two",   "user2@demo.local"),
-        ("user3", "User Three", "user3@demo.local"),
+        ("user1", "Analyst One",   "analyst1@ovrm.local"),
+        ("user2", "Analyst Two",   "analyst2@ovrm.local"),
+        ("user3", "Analyst Three", "analyst3@ovrm.local"),
     ]
     test_users = {}
     for uname, display, email in test_user_defs:
@@ -466,9 +498,9 @@ def seed_minimal():
     # ── Sources ─────────────────────────────────────────────────────
     source_titles = [
         "X (Twitter)",
-        "BBC News",
-        "Sussex Police",
-        "The Guardian",
+        "Albion Broadcasting",
+        "Lewes & Weald Constabulary",
+        "The National Courier",
         "ITV News",
         "Sky News",
         "Instagram",
@@ -476,6 +508,7 @@ def seed_minimal():
         "YouTube",
         "Witness Statement",
         "TikTok",
+        "Lewes Clarion",
     ]
     sources = {}
     for title in source_titles:
@@ -506,7 +539,7 @@ def seed_minimal():
         country_id=uk.id if uk else None,
         parent_id=east_sussex.id,
     )
-    lewes.latlng = from_shape(Point(-0.0083, 50.8748), srid=4326)
+    lewes.latlng = from_shape(Point(-0.0030, 50.8762), srid=4326)
     db.session.add(lewes)
     db.session.flush()
 
@@ -516,8 +549,71 @@ def seed_minimal():
         country_id=uk.id if uk else None,
         parent_id=lewes.id,
     )
-    castle.latlng = from_shape(Point(-0.0083, 50.8748), srid=4326)
+    castle.latlng = from_shape(Point(0.0074, 50.8729), srid=4326)
     db.session.add(castle)
+    db.session.flush()
+
+    crown_court = Location(
+        title="Lewes Crown Court",
+        location_type_id=loc_type_poi.id if loc_type_poi else None,
+        country_id=uk.id if uk else None,
+        parent_id=lewes.id,
+    )
+    crown_court.latlng = from_shape(Point(0.0102, 50.8721), srid=4326)
+    db.session.add(crown_court)
+    db.session.flush()
+
+    police_station = Location(
+        title="Lewes Police Station",
+        location_type_id=loc_type_poi.id if loc_type_poi else None,
+        country_id=uk.id if uk else None,
+        parent_id=lewes.id,
+    )
+    police_station.latlng = from_shape(Point(0.01148, 50.8751), srid=4326)
+    db.session.add(police_station)
+    db.session.flush()
+
+    lewes_prison = Location(
+        title="HM Prison Lewes",
+        location_type_id=loc_type_poi.id if loc_type_poi else None,
+        country_id=uk.id if uk else None,
+        parent_id=lewes.id,
+    )
+    lewes_prison.latlng = from_shape(Point(-0.0133, 50.8732), srid=4326)
+    db.session.add(lewes_prison)
+    db.session.flush()
+
+    brighton = Location(
+        title="Brighton",
+        location_type_id=loc_type_admin.id if loc_type_admin else None,
+        admin_level_id=admin_level.get("Town").id if admin_level.get("Town") else None,
+        country_id=uk.id if uk else None,
+        parent_id=east_sussex.id,
+    )
+    brighton.latlng = from_shape(Point(-0.1372, 50.8225), srid=4326)
+    db.session.add(brighton)
+    db.session.flush()
+
+    eastbourne = Location(
+        title="Eastbourne",
+        location_type_id=loc_type_admin.id if loc_type_admin else None,
+        admin_level_id=admin_level.get("Town").id if admin_level.get("Town") else None,
+        country_id=uk.id if uk else None,
+        parent_id=east_sussex.id,
+    )
+    eastbourne.latlng = from_shape(Point(0.2797, 50.7684), srid=4326)
+    db.session.add(eastbourne)
+    db.session.flush()
+
+    hastings = Location(
+        title="Hastings",
+        location_type_id=loc_type_admin.id if loc_type_admin else None,
+        admin_level_id=admin_level.get("Town").id if admin_level.get("Town") else None,
+        country_id=uk.id if uk else None,
+        parent_id=east_sussex.id,
+    )
+    hastings.latlng = from_shape(Point(0.5730, 50.8543), srid=4326)
+    db.session.add(hastings)
     db.session.flush()
 
     # Populate denormalised columns used by the UI for hierarchy display and search.
@@ -534,6 +630,36 @@ def seed_minimal():
 
     castle.full_location = "Lewes Castle, Lewes, East Sussex"
     castle.id_tree = f"[{castle.id}] [{lewes.id}] [{east_sussex.id}]"
+
+    crown_court.full_location = "Lewes Crown Court, Lewes, East Sussex"
+    crown_court.id_tree = f"[{crown_court.id}] [{lewes.id}] [{east_sussex.id}]"
+
+    police_station.full_location = "Lewes Police Station, Lewes, East Sussex"
+    police_station.id_tree = f"[{police_station.id}] [{lewes.id}] [{east_sussex.id}]"
+
+    lewes_prison.full_location = "HM Prison Lewes, Lewes, East Sussex"
+    lewes_prison.id_tree = f"[{lewes_prison.id}] [{lewes.id}] [{east_sussex.id}]"
+
+    brighton.full_location = "Brighton, East Sussex"
+    brighton.id_tree = f"[{brighton.id}] [{east_sussex.id}]"
+
+    eastbourne.full_location = "Eastbourne, East Sussex"
+    eastbourne.id_tree = f"[{eastbourne.id}] [{east_sussex.id}]"
+
+    hastings.full_location = "Hastings, East Sussex"
+    hastings.id_tree = f"[{hastings.id}] [{east_sussex.id}]"
+
+    meridian_house = Location(
+        title="Meridian House, Harvey's Brewery Site",
+        location_type_id=loc_type_poi.id if loc_type_poi else None,
+        country_id=uk.id if uk else None,
+        parent_id=lewes.id,
+    )
+    meridian_house.latlng = from_shape(Point(0.01664, 50.87484), srid=4326)
+    db.session.add(meridian_house)
+    db.session.flush()
+    meridian_house.full_location = "Meridian House, Harvey's Brewery Site, Lewes, East Sussex"
+    meridian_house.id_tree = f"[{meridian_house.id}] [{lewes.id}] [{east_sussex.id}]"
 
     db.session.flush()
 
@@ -597,25 +723,310 @@ def seed_minimal():
     a = Actor()
     a.name = "Thomas Ashdown"
     a.first_name = "Thomas"
+    a.middle_name = "James"
     a.last_name = "Ashdown"
+    a.nickname = "Tom"
+    a.father_name = "Robert"
+    a.mother_name = "Patricia"
     a.sex = "Male"
-    a.age = "Adult 18+"
+    a.age = "Adult"
     a.civilian = "Civilian"
     a.type = "Person"
+    a.occupation = "Self-employed builder"
+    a.position = "Organiser, Lewes Heritage Trust"
+    a.family_status = "Married"
+    a.no_children = 2
     a.comments = (
         "Identified in social media imagery at the front of the crowd "
         "outside Lewes Castle on 17 March 2026. Seen carrying a placard "
-        "and shouting through a megaphone. Resident of Lewes."
+        "and shouting through a megaphone. Lewes resident, self-employed "
+        "builder. Named by The National Courier as 'one of the organisers' of the "
+        "Lewes Heritage Trust occupation. Arrested on 19 March 2026 during "
+        "the clearance operation; charged with violent disorder and aggravated "
+        "trespass. His legal representative declined to comment."
     )
     a.status = status
-    a.tags = ["suspect", "lewes resident"]
-    a.id_number = []
+    a.assigned_to_id = test_users["user2"].id
+    a.first_peer_reviewer_id = test_users["user3"].id
+    a.second_peer_reviewer_id = test_users["user1"].id
+    a.tags = ["suspect", "lewes resident", "organiser", "arrested", "charged", "lewes heritage trust"]
+    a.id_number = [
+        {"type": "7", "number": "CRN/2026/LEW/00312"},
+        {"type": "4", "number": "T20261234"},
+    ]
     db.session.add(a)
     db.session.flush()
 
+    uk = Country.query.filter_by(title="United Kingdom").first()
+    if uk:
+        a.nationalities.append(uk)
+
+    a.origin_place_id = lewes.id
+
     profile = ActorProfile(actor_id=a.id, mode=2)
-    profile.description = a.comments
+    profile.originid = "x-lewes-castle-17mar2026-ashdown"
+    profile.description = (
+        "Thomas James Ashdown (b. approx. 1984), self-employed builder and "
+        "resident of Lewes, East Sussex. First identified on 17 March 2026 in "
+        "an X (Twitter) post showing him at the front of the crowd outside "
+        "Lewes Castle, carrying a placard and using a megaphone. Subsequently "
+        "named by The National Courier (19 March 2026) as 'one of the organisers' of "
+        "the Lewes Heritage Trust occupation of the castle. Eyewitness Margaret "
+        "Okafor confirmed (18 March statement) that a man matching his description "
+        "was near the front of the crowd when the barbican gate was breached. "
+        "Arrested on 19 March 2026 during the clearance operation. Charged with "
+        "violent disorder (Public Order Act 1986, s.2) and aggravated trespass "
+        "(Criminal Justice and Public Order Act 1994, s.68). His legal "
+        "representative declined to comment."
+    )
+    profile.source_link = "https://x.com/lewes_local/status/1901234567890"
+    profile.publish_date = _dt(2026, 3, 17, 14, 22)
+    profile.documentation_date = _dt(2026, 3, 19, 20, 0)
+    profile.sources.append(sources["X (Twitter)"])
+    profile.sources.append(sources["The National Courier"])
+    for key in ["Priority"]:
+        lbl = label_map.get(key)
+        if lbl:
+            profile.ver_labels.append(lbl)
     db.session.add(profile)
+
+    # ── Actor events ────────────────────────────────────────────────
+    evt_arrested_type = Eventtype.query.filter_by(title="Arrested").first()
+    evt_charged_type = Eventtype.query.filter_by(title="Charged").first()
+
+    actor_evt_arrested = Event(
+        title="Thomas Ashdown arrested during castle clearance",
+        eventtype_id=evt_arrested_type.id if evt_arrested_type else None,
+        from_date=_dt(2026, 3, 19, 7, 30),
+        to_date=_dt(2026, 3, 19, 8, 0),
+        location_id=castle.id,
+    )
+    db.session.add(actor_evt_arrested)
+    db.session.flush()
+    a.events.append(actor_evt_arrested)
+
+    actor_evt_charged = Event(
+        title="Charged with violent disorder and aggravated trespass",
+        eventtype_id=evt_charged_type.id if evt_charged_type else None,
+        from_date=_dt(2026, 3, 19, 15, 30),
+        to_date=_dt(2026, 3, 19, 15, 30),
+        location_id=police_station.id,
+    )
+    db.session.add(actor_evt_charged)
+    db.session.flush()
+    a.events.append(actor_evt_charged)
+
+    # ── Actor 2: Rachel Pemberton ────────────────────────────────────
+    a2 = Actor()
+    a2.name = "Rachel Pemberton"
+    a2.first_name = "Rachel"
+    a2.middle_name = "Anne"
+    a2.last_name = "Pemberton"
+    a2.sex = "Female"
+    a2.age = "Adult"
+    a2.civilian = "Civilian"
+    a2.type = "Person"
+    a2.occupation = "Retired secondary school teacher"
+    a2.position = "Chair, Lewes Heritage Trust"
+    a2.family_status = "Widowed"
+    a2.no_children = 1
+    a2.comments = (
+        "Chair of the Lewes Heritage Trust. Arrested on 19 March 2026 during "
+        "the clearance of Lewes Castle alongside Thomas Ashdown. Named by The "
+        "National Courier as 'a leader of the occupation'. Long-standing Lewes "
+        "resident and retired history teacher; well known locally as a heritage "
+        "campaigner. Released on bail. No charges confirmed at time of writing."
+    )
+    a2.status = status
+    a2.assigned_to_id = test_users["user1"].id
+    a2.first_peer_reviewer_id = test_users["user2"].id
+    a2.second_peer_reviewer_id = test_users["user3"].id
+    a2.tags = ["arrested", "chair", "lewes heritage trust", "lewes resident", "bail"]
+    a2.id_number = [{"type": "7", "number": "CRN/2026/LEW/00313"}]
+    db.session.add(a2)
+    db.session.flush()
+
+    uk2 = Country.query.filter_by(title="United Kingdom").first()
+    if uk2:
+        a2.nationalities.append(uk2)
+    a2.origin_place_id = lewes.id
+
+    profile2 = ActorProfile(actor_id=a2.id, mode=2)
+    profile2.originid = "nationalcourier-lewes-castle-19mar2026-pemberton"
+    profile2.description = (
+        "Rachel Anne Pemberton (b. approx. 1961), retired secondary school "
+        "history teacher and Chair of the Lewes Heritage Trust. Long-standing "
+        "resident of Lewes and prominent local heritage campaigner. Arrested on "
+        "19 March 2026 during the clearance of Lewes Castle; named by The "
+        "National Courier alongside Thomas Ashdown as 'a leader of the "
+        "occupation'. Released on bail the same evening. No charges confirmed "
+        "at the time of documentation. Her role as Chair of the Trust makes her "
+        "the senior figure of the two named organisers; Ashdown is understood "
+        "to have handled operational planning."
+    )
+    profile2.source_link = "https://www.thenationalcourier.co.uk/uk-news/2026/mar/19/lewes-castle-siege-ends"
+    profile2.publish_date = _dt(2026, 3, 19, 14, 20)
+    profile2.documentation_date = _dt(2026, 3, 23, 9, 0)
+    profile2.sources.append(sources["The National Courier"])
+    profile2.sources.append(sources["Witness Statement"])
+    for key in ["Priority"]:
+        lbl = label_map.get(key)
+        if lbl:
+            profile2.ver_labels.append(lbl)
+    db.session.add(profile2)
+
+    a2_evt_arrested = Event(
+        title="Rachel Pemberton arrested during castle clearance",
+        eventtype_id=evt_arrested_type.id if evt_arrested_type else None,
+        from_date=_dt(2026, 3, 19, 7, 30),
+        to_date=_dt(2026, 3, 19, 8, 0),
+        location_id=castle.id,
+    )
+    db.session.add(a2_evt_arrested)
+    db.session.flush()
+    a2.events.append(a2_evt_arrested)
+
+    evt_released_type = Eventtype.query.filter_by(title="Released").first()
+    a2_evt_released = Event(
+        title="Rachel Pemberton released on bail",
+        eventtype_id=evt_released_type.id if evt_released_type else None,
+        from_date=_dt(2026, 3, 19, 18, 30),
+        to_date=_dt(2026, 3, 19, 18, 30),
+        location_id=police_station.id,
+    )
+    db.session.add(a2_evt_released)
+    db.session.flush()
+    a2.events.append(a2_evt_released)
+
+    # ── Actor 3: Kieran Moss ─────────────────────────────────────────
+    a3 = Actor()
+    a3.name = "Kieran Moss"
+    a3.first_name = "Kieran"
+    a3.last_name = "Moss"
+    a3.sex = "Male"
+    a3.age = "Adult"
+    a3.civilian = "Civilian"
+    a3.type = "Person"
+    a3.occupation = "Postgraduate student, Southdown University"
+    a3.position = "Volunteer, Lewes Heritage Trust"
+    a3.family_status = "Single"
+    a3.comments = (
+        "Identified in the X post from the Phoenix Causeway Tesco car park "
+        "protest on 18 March 2026 (Bulletin 11). Believed to have led the "
+        "secondary protest group. Not arrested. His knowledge of the Lewes "
+        "Heritage Trust campaign and proximity to the Meridian House site area "
+        "has been noted in connection with Incident 3, but there is no evidence "
+        "linking him to the criminal damage. Documentation ongoing."
+    )
+    a3.status = status_assigned
+    a3.assigned_to_id = test_users["user2"].id
+    a3.first_peer_reviewer_id = test_users["user1"].id
+    a3.tags = ["phoenix causeway", "tesco protest", "lewes heritage trust", "unconfirmed", "not arrested"]
+    a3.id_number = []
+    db.session.add(a3)
+    db.session.flush()
+
+    uk3 = Country.query.filter_by(title="United Kingdom").first()
+    if uk3:
+        a3.nationalities.append(uk3)
+    a3.origin_place_id = brighton.id
+
+    profile3 = ActorProfile(actor_id=a3.id, mode=2)
+    profile3.originid = "x-phoenix-causeway-18mar2026-moss"
+    profile3.description = (
+        "Kieran Moss, postgraduate student believed to be based in Brighton. "
+        "Identified from an X post (18 March 2026, 13:04 GMT) showing him at "
+        "the front of the protest group at the Tesco superstore car park, "
+        "Phoenix Causeway, Lewes. Believed to have coordinated the secondary "
+        "protest on day 2 of the castle occupation. Not arrested. Confirmed as "
+        "a volunteer with Lewes Heritage Trust via cross-referencing his social "
+        "media profile with the Trust's public communications. No criminal record "
+        "identified. Flagged as a person of interest in connection with Incident 3 "
+        "(criminal damage, Meridian House site) but with no supporting evidence."
+    )
+    profile3.source_link = "https://x.com/lewes_watch/status/1901234999001"
+    profile3.publish_date = _dt(2026, 3, 18, 13, 4)
+    profile3.documentation_date = _dt(2026, 3, 24, 14, 0)
+    profile3.sources.append(sources["X (Twitter)"])
+    db.session.add(profile3)
+
+    # ── Event type lookups (used throughout bulletin/incident creation)
+    et_pre = evt_types.get("Pre-Incident")
+    et = evt_types.get("Incident")
+    et_post = evt_types.get("Post-Incident")
+    et_pub = evt_types.get("Publication")
+
+    # ── Pre-incident: Lewes Clarion article ────────────────────────
+    b_pre = Bulletin()
+    b_pre.title = (
+        "Anger in Lewes as council approves demolition of Meridian House"
+    )
+    b_pre.sjac_title = "Lewes Clarion: council approves demolition of Meridian House — 3 Mar 2026"
+    b_pre.description = (
+        "Lewes Clarion article published online at 09:15 GMT on 3 March 2026. "
+        "Reports that Lewes District Council voted 7–4 to approve a planning "
+        "application for the demolition of Meridian House, a Grade II listed "
+        "Victorian building adjacent to Lewes Castle, to make way for a mixed-use "
+        "development. The decision was met with protests from residents inside and "
+        "outside the public gallery. Heritage campaign group 'Lewes Heritage Trust' "
+        "issued a statement describing the decision as 'a betrayal of Lewes's "
+        "identity' and warning that 'direct action will follow if this decision "
+        "is not reversed'. "
+        "\n\n"
+        "The article quotes councillor Diana Forsythe (Conservative) defending the "
+        "decision on economic grounds, and local historian Dr. Caroline Voss calling "
+        "it 'an irreversible loss to one of England's best-preserved medieval towns'. "
+        "A petition against the demolition has received 4,200 signatures."
+    )
+    b_pre.originid = "lc-meridian-house-03mar2026"
+    b_pre.source_link = "https://www.lewesclarion.co.uk/news/lewes/meridian-house-demolition-approved-2026"
+    b_pre.publish_date = _dt(2026, 3, 3, 9, 15)
+    b_pre.documentation_date = _dt(2026, 3, 19, 17, 0)
+    b_pre.reliability_score = 70
+    b_pre.comments = (
+        "Documented retrospectively on 19 March once the connection to the siege "
+        "was established. The National Courier article of 19 March names 'Lewes Heritage Trust' "
+        "and cites the Meridian House demolition as the trigger for the occupation. "
+        "This article establishes the group's stated intent to take direct action "
+        "and names Dr. Caroline Voss — who later issued the damage statement — as "
+        "an opponent of the demolition. Key context for the incident."
+    )
+    b_pre.status = status_assigned
+    b_pre.user_id = admin.id
+    b_pre.assigned_to_id = test_users["user1"].id
+    b_pre.tags = ["Lewes", "Meridian House", "Lewes Heritage Trust", "planning", "demolition", "pre-incident", "Lewes Clarion"]
+    db.session.add(b_pre)
+    db.session.flush()
+
+    for key in ["Protest / Demonstration", "Heritage Site Threatened"]:
+        lbl = label_map.get(key)
+        if lbl:
+            b_pre.labels.append(lbl)
+    b_pre.locations.append(lewes)
+    b_pre.sources.append(sources["Lewes Clarion"])
+
+    geo_type_comm = GeoLocationType.query.filter_by(title="Commercial/Retail").first()
+    geo_meridian = GeoLocation()
+    geo_meridian.title = "Meridian House (proposed demolition site)"
+    geo_meridian.latlng = "POINT(0.01664 50.87484)"
+    geo_meridian.type_id = geo_type_comm.id if geo_type_comm else None
+    geo_meridian.main = False
+    geo_meridian.comment = "Grade II listed Victorian building at the Harvey's Brewery site. Subject of the planning application that triggered the protest."
+    geo_meridian.bulletin_id = b_pre.id
+    db.session.add(geo_meridian)
+    db.session.flush()
+
+    pre_evt = Event(
+        title="Lewes District Council votes to approve demolition of Meridian House",
+        eventtype_id=et_pre.id if et_pre else None,  # Pre-Incident
+        from_date=_dt(2026, 3, 3, 18, 0),
+        to_date=_dt(2026, 3, 3, 21, 0),
+        location_id=meridian_house.id,
+        comments="Council vote triggers Lewes Heritage Trust warning of direct action.",
+    )
+    db.session.add(pre_evt)
+    db.session.flush()
+    b_pre.events.append(pre_evt)
 
     # ── Bulletin ────────────────────────────────────────────────────
     b = Bulletin()
@@ -674,26 +1085,38 @@ def seed_minimal():
 
     geo = GeoLocation()
     geo.title = "Lewes Castle"
-    geo.latlng = "POINT(-0.0083 50.8748)"
+    geo.latlng = "POINT(0.0074 50.8729)"
     geo.type_id = geo_type_hist.id if geo_type_hist else None
     geo.main = True
     geo.comment = "11th-century Norman castle. Crowd gathered at the barbican gate."
     geo.bulletin_id = b.id
     db.session.add(geo)
+
     db.session.flush()
 
     # ── Bulletin event ──────────────────────────────────────────────
-    et = evt_types.get("Incident")
+
     evt = Event(
-        title="Crowd gathers at Lewes Castle barbican",
-        eventtype_id=et.id if et else None,
-        from_date=_dt(2026, 3, 17, 13, 30),
-        to_date=_dt(2026, 3, 17, 17, 0),
+        title="Crowd forces entry through barbican gate",
+        eventtype_id=et.id if et else None,  # Incident
+        from_date=_dt(2026, 3, 17, 14, 0),
+        to_date=_dt(2026, 3, 17, 14, 30),
         location_id=castle.id,
     )
     db.session.add(evt)
     db.session.flush()
     b.events.append(evt)
+
+    evt_pub_b = Event(
+        title="X post published by @lewes_local",
+        eventtype_id=et_pub.id if et_pub else None,  # Publication
+        from_date=_dt(2026, 3, 17, 14, 22),
+        to_date=_dt(2026, 3, 17, 14, 22),
+        location_id=castle.id,
+    )
+    db.session.add(evt_pub_b)
+    db.session.flush()
+    b.events.append(evt_pub_b)
 
     # ── Facebook bulletin ───────────────────────────────────────────
     b_fb = Bulletin()
@@ -738,6 +1161,20 @@ def seed_minimal():
             b_fb.ver_labels.append(lbl)
     b_fb.locations.append(castle)
     b_fb.sources.append(sources["Facebook"])
+    b_fb.events.append(evt)
+
+    # ── GeoLocation (map marker) ──────────────────────────────────
+    geo_type_infra = GeoLocationType.query.filter_by(title="Infrastructure").first()
+
+    geo_fb = GeoLocation()
+    geo_fb.title = "Approach road south of Lewes Castle"
+    geo_fb.latlng = "POINT(0.0068 50.8718)"
+    geo_fb.type_id = geo_type_infra.id if geo_type_infra else None
+    geo_fb.main = False
+    geo_fb.comment = "Road south of the castle barbican — location of police vehicles and crowd photographed from car window."
+    geo_fb.bulletin_id = b_fb.id
+    db.session.add(geo_fb)
+    db.session.flush()
 
     # ── Instagram bulletin ──────────────────────────────────────────
     b_ig = Bulletin()
@@ -785,6 +1222,7 @@ def seed_minimal():
             b_ig.ver_labels.append(lbl)
     b_ig.locations.append(castle)
     b_ig.sources.append(sources["Instagram"])
+    b_ig.events.append(evt)
 
     # ── TikTok bulletin ─────────────────────────────────────────────
     b_tt = Bulletin()
@@ -830,6 +1268,7 @@ def seed_minimal():
             b_tt.ver_labels.append(lbl)
     b_tt.locations.append(castle)
     b_tt.sources.append(sources["TikTok"])
+    b_tt.events.append(evt)
 
     # ── Eyewitness statement bulletin ──────────────────────────────
     b_ew = Bulletin()
@@ -840,7 +1279,7 @@ def seed_minimal():
     b_ew.sjac_title = "Witness statement: castle ticket office staff member — 17 Mar 2026"
     b_ew.description = (
         "Written statement provided by Margaret Okafor, ticket office supervisor "
-        "at Lewes Castle, taken by Sussex Police on 18 March 2026 (ref: SP-2026-0317-04). "
+        "at Lewes Castle, taken by Lewes & Weald Constabulary on 18 March 2026 (ref: SP-2026-0317-04). "
         "\n\n"
         "\"I was on duty in the ticket office at approximately 13:45 when I noticed a "
         "large number of people gathering outside the barbican gate. There were far more "
@@ -868,7 +1307,7 @@ def seed_minimal():
     b_ew.reliability_score = 80
     b_ew.comments = (
         "Primary eyewitness account from a credible source — on-site staff member "
-        "with 11 years at the castle. Statement taken under caution by Sussex Police "
+        "with 11 years at the castle. Statement taken under caution by Lewes & Weald Constabulary "
         "the day after the incident. Key value: confirms the gate breach mechanism, "
         "the presence of a school group, the timing of the keep damage, and places a "
         "person matching Ashdown's description at the front of the crowd. "
@@ -892,35 +1331,285 @@ def seed_minimal():
     b_ew.locations.append(castle)
     b_ew.sources.append(sources["Witness Statement"])
 
-    # ── Actor-to-Bulletin link ──────────────────────────────────────
+    ew_evt = Event(
+        title="Witness statement taken by Lewes & Weald Constabulary",
+        eventtype_id=et_post.id if et_post else None,  # Post-Incident
+        from_date=_dt(2026, 3, 18, 10, 30),
+        to_date=_dt(2026, 3, 18, 10, 30),
+        location_id=castle.id,
+        comments="Statement by Margaret Okafor, ticket office supervisor, reference SP-2026-0317-04.",
+    )
+    db.session.add(ew_evt)
+    db.session.flush()
+    b_ew.events.append(ew_evt)
+
+    # ── Day 2: Albion Broadcasting article ─────────────────────────────────────
+    b_bbc = Bulletin()
+    b_bbc.title = (
+        "Lewes Castle siege enters second night as police establish cordon"
+    )
+    b_bbc.sjac_title = "Albion Broadcasting article: day 2 of Lewes Castle occupation — 18 Mar 2026"
+    b_bbc.description = (
+        "Albion Broadcasting online article published at 17:45 GMT on 18 March 2026. "
+        "Reports that approximately 80 protesters remain inside the castle grounds "
+        "following an overnight occupation. Lewes & Weald Constabulary have established a cordon "
+        "around the perimeter and declared the surrounding streets a Section 14 area "
+        "under the Public Order Act. A police spokesperson confirmed that formal "
+        "negotiations with protest organisers began at 09:00. Site curator Dr. Caroline Voss "
+        "issued a statement via the National Monuments Authority describing 'significant damage "
+        "to the east wall of the Norman keep' and calling for the immediate evacuation "
+        "of the site. No injuries reported. The article includes aerial photography "
+        "sourced from a commercial drone operator showing tents pitched in the outer ward."
+    )
+    b_bbc.originid = "albion-lewes-castle-18mar2026"
+    b_bbc.source_link = "https://www.albionbroadcasting.co.uk/news/uk-england-sussex-lewes-castle-18mar2026"
+    b_bbc.publish_date = _dt(2026, 3, 18, 17, 45)
+    b_bbc.documentation_date = _dt(2026, 3, 18, 20, 0)
+    b_bbc.reliability_score = 75
+    b_bbc.comments = (
+        "Credible national news source. Article cites named police spokesperson and "
+        "Dr. Caroline Voss directly — both independently corroborated. Aerial photograph "
+        "confirms continued occupation and scale. Crowd figure of 80 is lower than day 1 "
+        "estimate of 200 — consistent with overnight attrition."
+    )
+    b_bbc.status = status_assigned
+    b_bbc.user_id = admin.id
+    b_bbc.assigned_to_id = test_users["user3"].id
+    b_bbc.tags = ["Lewes", "castle siege", "Albion Broadcasting", "day 2", "police cordon", "negotiations", "East Sussex"]
+    db.session.add(b_bbc)
+    db.session.flush()
+
+    for key in ["Siege / Occupation", "Heritage Site Threatened"]:
+        lbl = label_map.get(key)
+        if lbl:
+            b_bbc.labels.append(lbl)
+    for key in ["Social Media Post", "Outdoor Scene", "Priority"]:
+        lbl = label_map.get(key)
+        if lbl:
+            b_bbc.ver_labels.append(lbl)
+    b_bbc.locations.append(castle)
+    b_bbc.sources.append(sources["Albion Broadcasting"])
+
+    # ── Day 2: Lewes & Weald Constabulary press statement ────────────────────────
+    b_sp = Bulletin()
+    b_sp.title = (
+        "Lewes & Weald Constabulary: statement regarding Lewes Castle major incident — 18 March 2026"
+    )
+    b_sp.sjac_title = "Lewes & Weald Constabulary press statement: day 2 update — 18 Mar 2026"
+    b_sp.description = (
+        "Official press statement published by Lewes & Weald Constabulary at 12:00 GMT on "
+        "18 March 2026 (reference: SP-PRESS-2026-0318-01). "
+        "\n\n"
+        "\"Lewes & Weald Constabulary can confirm that a major incident declared at Lewes Castle "
+        "on 17 March 2026 remains ongoing. Approximately 80 individuals are currently "
+        "occupying the castle grounds. A cordon has been established and negotiations "
+        "are underway. We are working to resolve this situation peacefully. "
+        "\n\n"
+        "A Section 14 direction has been issued for the surrounding area under the "
+        "Public Order Act 1986. Members of the public are asked to avoid the town "
+        "centre. No serious injuries have been reported. Anyone with information is "
+        "asked to contact Lewes & Weald Constabulary on 101 quoting reference 2026-0317.\""
+    )
+    b_sp.originid = "SP-PRESS-2026-0318-01"
+    b_sp.source_link = "https://www.leweswealdconstabulary.police.uk/news/lewes-castle-major-incident-day2"
+    b_sp.publish_date = _dt(2026, 3, 18, 12, 0)
+    b_sp.documentation_date = _dt(2026, 3, 18, 15, 30)
+    b_sp.reliability_score = 85
+    b_sp.comments = (
+        "Official police statement — high reliability for factual claims about police "
+        "actions (cordon, Section 14, negotiations). Crowd figure of ~80 consistent "
+        "with BBC report. Statement is cautiously worded — does not confirm damage "
+        "or name individuals."
+    )
+    b_sp.status = status_assigned
+    b_sp.user_id = admin.id
+    b_sp.assigned_to_id = test_users["user1"].id
+    b_sp.tags = ["Lewes", "castle siege", "Lewes & Weald Constabulary", "press statement", "day 2", "Section 14"]
+    db.session.add(b_sp)
+    db.session.flush()
+
+    for key in ["Siege / Occupation", "Protest / Demonstration"]:
+        lbl = label_map.get(key)
+        if lbl:
+            b_sp.labels.append(lbl)
+    for key in ["Priority"]:
+        lbl = label_map.get(key)
+        if lbl:
+            b_sp.ver_labels.append(lbl)
+    b_sp.locations.append(castle)
+    b_sp.sources.append(sources["Lewes & Weald Constabulary"])
+
+    # ── Day 3: The National Courier article ─────────────────────────────────
+    b_grdn = Bulletin()
+    b_grdn.title = (
+        "Lewes Castle protesters disperse after three-day occupation — seven arrested"
+    )
+    b_grdn.sjac_title = "The National Courier article: end of Lewes Castle siege — 19 Mar 2026"
+    b_grdn.description = (
+        "The National Courier online article published at 14:20 GMT on 19 March 2026. "
+        "Reports that the three-day occupation of Lewes Castle ended at approximately "
+        "11:00 GMT after protesters agreed to leave voluntarily following overnight "
+        "negotiations. Seven individuals were arrested on suspicion of aggravated "
+        "trespass and criminal damage under the Criminal Justice and Public Order "
+        "Act 1994. The article names the protest group as 'Lewes Heritage Trust' and "
+        "states their demands related to the proposed demolition of a nearby listed "
+        "building. National Monuments Authority confirmed the castle would remain closed for "
+        "structural assessment. The article quotes Thomas Ashdown by name as 'one "
+        "of the organisers' — his legal representative declined to comment."
+    )
+    b_grdn.originid = "nationalcourier-lewes-castle-19mar2026"
+    b_grdn.source_link = "https://www.thenationalcourier.co.uk/uk-news/2026/mar/19/lewes-castle-siege-ends"
+    b_grdn.publish_date = _dt(2026, 3, 19, 14, 20)
+    b_grdn.documentation_date = _dt(2026, 3, 19, 16, 0)
+    b_grdn.reliability_score = 75
+    b_grdn.comments = (
+        "Names Ashdown as an organiser — first source to do so explicitly. "
+        "Seven arrests figure consistent with police statement. Protest group name "
+        "'Lewes Heritage Trust' not corroborated elsewhere yet — treat as unverified. "
+        "Castle closure confirmed independently via National Monuments Authority website."
+    )
+    b_grdn.status = status_assigned
+    b_grdn.user_id = admin.id
+    b_grdn.assigned_to_id = test_users["user2"].id
+    b_grdn.tags = ["Lewes", "castle siege", "The National Courier", "day 3", "arrests", "dispersal", "Lewes Heritage Trust"]
+    db.session.add(b_grdn)
+    db.session.flush()
+
+    for key in ["Siege / Occupation", "Protest / Demonstration", "Trespass Alleged", "Property Damage Alleged"]:
+        lbl = label_map.get(key)
+        if lbl:
+            b_grdn.labels.append(lbl)
+    for key in ["Social Media Post", "Priority"]:
+        lbl = label_map.get(key)
+        if lbl:
+            b_grdn.ver_labels.append(lbl)
+    b_grdn.locations.append(castle)
+    b_grdn.sources.append(sources["The National Courier"])
+
+    # ── Day 3: Lewes & Weald Constabulary arrest statement ───────────────────────
+    b_sp2 = Bulletin()
+    b_sp2.title = (
+        "Lewes & Weald Constabulary: seven arrests following Lewes Castle occupation — 19 March 2026"
+    )
+    b_sp2.sjac_title = "Lewes & Weald Constabulary press statement: arrests and closure — 19 Mar 2026"
+    b_sp2.description = (
+        "Official press statement published by Lewes & Weald Constabulary at 13:30 GMT on "
+        "19 March 2026 (reference: SP-PRESS-2026-0319-01). "
+        "\n\n"
+        "\"Lewes & Weald Constabulary can confirm that the major incident at Lewes Castle has now "
+        "concluded. The site was cleared of all unauthorised persons at approximately "
+        "11:00 GMT on 19 March 2026. Seven individuals, aged between 22 and 47, "
+        "have been arrested on suspicion of aggravated trespass and criminal damage. "
+        "All are currently in custody. "
+        "\n\n"
+        "We would like to thank the public for their patience during this incident. "
+        "The castle remains closed pending a structural survey by National Monuments Authority. "
+        "An investigation into the circumstances of the occupation is ongoing.\""
+    )
+    b_sp2.originid = "SP-PRESS-2026-0319-01"
+    b_sp2.source_link = "https://www.leweswealdconstabulary.police.uk/news/lewes-castle-major-incident-resolved"
+    b_sp2.publish_date = _dt(2026, 3, 19, 13, 30)
+    b_sp2.documentation_date = _dt(2026, 3, 19, 15, 0)
+    b_sp2.reliability_score = 90
+    b_sp2.comments = (
+        "High reliability — official police statement confirming end of incident, "
+        "arrest count (7), age range, and charges. Confirms castle closure. "
+        "Does not name individuals arrested."
+    )
+    b_sp2.status = status_assigned
+    b_sp2.user_id = admin.id
+    b_sp2.assigned_to_id = test_users["user3"].id
+    b_sp2.tags = ["Lewes", "castle siege", "Lewes & Weald Constabulary", "press statement", "day 3", "arrests", "seven arrested"]
+    db.session.add(b_sp2)
+    db.session.flush()
+
+    for key in ["Siege / Occupation", "Trespass Alleged", "Property Damage Alleged"]:
+        lbl = label_map.get(key)
+        if lbl:
+            b_sp2.labels.append(lbl)
+    for key in ["Priority"]:
+        lbl = label_map.get(key)
+        if lbl:
+            b_sp2.ver_labels.append(lbl)
+    b_sp2.locations.append(castle)
+    b_sp2.sources.append(sources["Lewes & Weald Constabulary"])
+
+    # ── Actor-to-Bulletin links ─────────────────────────────────────
+    # X post: Ashdown visible at front of crowd (Appeared, Certain)
     atob = Atob(actor_id=a.id, bulletin_id=b.id)
     atob.related_as = [4]  # Appeared
-    atob.probability = 85
+    atob.probability = 2  # Certain
     atob.comment = "Ashdown visible at the front of the crowd in the X post image."
     atob.user_id = admin.id
     db.session.add(atob)
+
+    # TikTok: interior footage — man matching description, unconfirmed (Appeared, Probable)
+    atob_tt = Atob(actor_id=a.id, bulletin_id=b_tt.id)
+    atob_tt.related_as = [4]  # Appeared
+    atob_tt.probability = 1  # Probable
+    atob_tt.comment = "Interior footage shows a man matching Ashdown's description near the keep. Not confirmed."
+    atob_tt.user_id = admin.id
+    db.session.add(atob_tt)
+
+    # Eyewitness statement: Margaret Okafor confirms man matching his description (Subject, Certain)
+    atob_ew = Atob(actor_id=a.id, bulletin_id=b_ew.id)
+    atob_ew.related_as = [6]  # Subject
+    atob_ew.probability = 2  # Certain
+    atob_ew.comment = "Okafor confirmed man matching Ashdown's description near barbican gate when breached."
+    atob_ew.user_id = admin.id
+    db.session.add(atob_ew)
+
+    # Guardian: names Ashdown as organiser (Appeared, Certain)
+    atob_grdn = Atob(actor_id=a.id, bulletin_id=b_grdn.id)
+    atob_grdn.related_as = [4]  # Appeared
+    atob_grdn.probability = 2  # Certain
+    atob_grdn.comment = "Guardian article names Ashdown by name as 'one of the organisers'."
+    atob_grdn.user_id = admin.id
+    db.session.add(atob_grdn)
+
+    # Rachel Pemberton: National Courier (Appeared, Certain) + X post (Appeared, Probable)
+    atob_p1 = Atob(actor_id=a2.id, bulletin_id=b_grdn.id)
+    atob_p1.related_as = [4]  # Appeared
+    atob_p1.probability = 2  # Certain
+    atob_p1.comment = "National Courier names Pemberton as 'a leader of the occupation'."
+    atob_p1.user_id = admin.id
+    db.session.add(atob_p1)
+
+    atob_p2 = Atob(actor_id=a2.id, bulletin_id=b.id)
+    atob_p2.related_as = [4]  # Appeared
+    atob_p2.probability = 1  # Probable
+    atob_p2.comment = "Pemberton likely in crowd but not individually identified in X post image."
+    atob_p2.user_id = admin.id
+    db.session.add(atob_p2)
+
     db.session.flush()
 
     # ── Incident ────────────────────────────────────────────────────
     inc = Incident()
-    inc.title = "Siege of Lewes Castle (17 March 2026)"
+    inc.title = "Unlawful occupation and criminal damage — Lewes Castle, 17–19 March 2026"
     inc.description = (
         "On 17 March 2026 a crowd of approximately 200 people converged on "
         "Lewes Castle in the town of Lewes, East Sussex. The group forced entry "
         "through the barbican gate at around 14:00 GMT and occupied the castle "
-        "grounds. Police declared a major incident at 14:45. Minor "
-        "damage was reported to the 11th-century Norman keep. The site was "
-        "cleared by 18:30 following negotiation. Several arrests were made."
+        "grounds. Police declared a major incident at 14:45. Minor damage was "
+        "reported to the 11th-century Norman keep. Protesters remained inside "
+        "overnight as police established a cordon around the site. On 18 March "
+        "formal negotiations began between police liaison officers and protest "
+        "organisers. A statement was issued by site curator Dr. Caroline Voss "
+        "confirming structural damage to the keep. On 19 March protesters agreed "
+        "to disperse voluntarily; the castle was fully cleared by 11:00 GMT. "
+        "Seven arrests were made over the course of the three-day occupation."
     )
     inc.status = status
     inc.assigned_to_id = test_users["user2"].id
     inc.first_peer_reviewer_id = test_users["user3"].id
     inc.second_peer_reviewer_id = test_users["user1"].id
     inc.comments = (
-        "Incident confirmed via cross-referencing the X post image with BBC News "
+        "Incident confirmed via cross-referencing the X post image with Albion Broadcasting "
         "and a police press release. Damage to the Norman keep confirmed by "
-        "a statement issued by Dr. Sarah Mellor, site curator, on 18 March 2026. "
-        "Three arrests confirmed by police. Incident closed and peer reviewed."
+        "a statement issued by Dr. Caroline Voss, site curator, on 18 March 2026. "
+        "Seven arrests confirmed by police press release dated 19 March 2026. "
+        "Incident closed and peer reviewed."
     )
     db.session.add(inc)
     db.session.flush()
@@ -947,32 +1636,102 @@ def seed_minimal():
         if lbl:
             inc.labels.append(lbl)
 
-    # Incident event
+    # Incident events
     inc_evt = Event(
         title="Crowd forces entry through barbican gate",
-        eventtype_id=et.id if et else None,
+        eventtype_id=et.id if et else None,  # Incident
         from_date=_dt(2026, 3, 17, 14, 0),
         to_date=_dt(2026, 3, 17, 14, 30),
         location_id=castle.id,
     )
     db.session.add(inc_evt)
     db.session.flush()
+    inc.events.append(pre_evt)
     inc.events.append(inc_evt)
+
+    inc_evt2 = Event(
+        title="Police begin formal negotiations with protest organisers",
+        eventtype_id=et_post.id if et_post else None,  # Post-Incident
+        from_date=_dt(2026, 3, 18, 9, 0),
+        to_date=_dt(2026, 3, 18, 18, 0),
+        location_id=castle.id,
+        comments=(
+            "Police liaison officers established contact with protest leaders. "
+            "Dr. Caroline Voss issued a statement confirming damage to the Norman keep."
+        ),
+    )
+    db.session.add(inc_evt2)
+    db.session.flush()
+    inc.events.append(inc_evt2)
+    b_sp.events.append(inc_evt2)
+
+    inc_evt3 = Event(
+        title="Castle cleared — protesters disperse, seven arrests made",
+        eventtype_id=et_post.id if et_post else None,  # Post-Incident
+        from_date=_dt(2026, 3, 19, 7, 0),
+        to_date=_dt(2026, 3, 19, 11, 0),
+        location_id=castle.id,
+        comments=(
+            "Protesters agreed to leave voluntarily following overnight negotiations. "
+            "Seven individuals arrested on suspicion of aggravated trespass and criminal damage."
+        ),
+    )
+    db.session.add(inc_evt3)
+    db.session.flush()
+    inc.events.append(inc_evt3)
+    b_sp2.events.append(inc_evt3)
+
+    # Publication events for news articles
+    pub_evt_bbc = Event(
+        title="Albion Broadcasting reports day 2 of Lewes Castle occupation",
+        eventtype_id=et_pub.id if et_pub else None,  # Publication
+        from_date=_dt(2026, 3, 18, 17, 45),
+        to_date=_dt(2026, 3, 18, 17, 45),
+        location_id=castle.id,
+    )
+    db.session.add(pub_evt_bbc)
+    db.session.flush()
+    b_bbc.events.append(pub_evt_bbc)
+
+    pub_evt_grdn = Event(
+        title="The National Courier reports end of siege and seven arrests",
+        eventtype_id=et_pub.id if et_pub else None,  # Publication
+        from_date=_dt(2026, 3, 19, 14, 20),
+        to_date=_dt(2026, 3, 19, 14, 20),
+        location_id=castle.id,
+    )
+    db.session.add(pub_evt_grdn)
+    db.session.flush()
+    b_grdn.events.append(pub_evt_grdn)
 
     # Incident-to-Bulletin link
     itob = Itob(incident_id=inc.id, bulletin_id=b.id)
     itob.related_as = 2  # Primary Evidence
-    itob.probability = 95
+    itob.probability = 2  # Certain
     itob.comment = "X post image is the earliest known visual evidence of the crowd."
     itob.user_id = admin.id
     db.session.add(itob)
 
-    # Incident-to-Bulletin links for Facebook, Instagram, TikTok, and eyewitness bulletins
+    # Incident-to-Bulletin link for pre-incident context article
+    db.session.add(Itob(
+        incident_id=inc.id,
+        bulletin_id=b_pre.id,
+        related_as=4,  # Context
+        probability=2,  # Certain
+        comment="Establishes Lewes Heritage Trust's stated intent and the Meridian House demolition as the trigger.",
+        user_id=admin.id,
+    ))
+
+    # Incident-to-Bulletin links for remaining bulletins
     for new_b, rel_type, prob, comment in [
-        (b_fb, 3, 60, "Facebook post corroborates police presence and crowd scale."),
-        (b_ig, 3, 75, "Instagram photograph provides best available crowd-size evidence."),
-        (b_tt, 2, 90, "TikTok video is only footage from inside the grounds — shows breach and damage."),
-        (b_ew, 2, 90, "Eyewitness statement confirms gate breach, keep damage, and Ashdown's position."),
+        (b_fb, 3, 1, "Facebook post corroborates police presence and crowd scale."),
+        (b_ig, 3, 1, "Instagram photograph provides best available crowd-size evidence."),
+        (b_tt, 2, 2, "TikTok video is only footage from inside the grounds — shows breach and damage."),
+        (b_ew, 2, 2, "Eyewitness statement confirms gate breach, keep damage, and Ashdown's position."),
+        (b_bbc, 3, 1, "Albion Broadcasting article corroborates day 2 occupation, police cordon, and keep damage."),
+        (b_sp, 2, 2, "Official police statement confirms major incident, cordon, and Section 14 direction."),
+        (b_grdn, 3, 1, "Guardian article names Ashdown as organiser and reports seven arrests."),
+        (b_sp2, 2, 2, "Official police statement confirms end of incident, seven arrests, and castle closure."),
     ]:
         db.session.add(Itob(
             incident_id=inc.id,
@@ -984,13 +1743,453 @@ def seed_minimal():
         ))
     db.session.flush()
 
-    # Incident-to-Actor link
+    # Incident-to-Actor links for Incident 1
     itoa = Itoa(actor_id=a.id, incident_id=inc.id)
     itoa.related_as = [5]  # Participant
-    itoa.probability = 85
+    itoa.probability = 2  # Certain
     itoa.comment = "Ashdown identified as a participant in the siege."
     itoa.user_id = admin.id
     db.session.add(itoa)
+
+    itoa_p = Itoa(actor_id=a2.id, incident_id=inc.id)
+    itoa_p.related_as = [5]  # Participant
+    itoa_p.probability = 2  # Certain
+    itoa_p.comment = "Pemberton named by The National Courier as a leader of the occupation; arrested on site."
+    itoa_p.user_id = admin.id
+    db.session.add(itoa_p)
+    db.session.flush()
+
+    # ── Second incident: Tesco car park protest ──────────────────────
+    inc2 = Incident()
+    inc2.title = "Unlawful assembly and obstruction — Phoenix Causeway, Lewes, 18 March 2026"
+    inc2.description = (
+        "On 18 March 2026, during the second day of the Lewes Castle siege, a "
+        "secondary group of approximately 60 supporters of the Lewes Heritage Trust "
+        "gathered in the car park of the Tesco superstore on Phoenix Causeway, Lewes. "
+        "The group blocked access to several loading bays and distributed leaflets "
+        "calling for the reversal of the Meridian House demolition decision. "
+        "Lewes & Weald Constabulary attended and issued a Section 35 dispersal order under the "
+        "Anti-Social Behaviour, Crime and Policing Act 2014. The group dispersed "
+        "without arrest by approximately 16:30 GMT."
+    )
+    inc2.status = status_assigned
+    inc2.assigned_to_id = test_users["user1"].id
+    inc2.first_peer_reviewer_id = test_users["user2"].id
+    inc2.comments = (
+        "Confirmed via X post and Albion Broadcasting coverage. No arrests made. "
+        "Likely connected to the castle siege — same protest group, same day."
+    )
+    db.session.add(inc2)
+    db.session.flush()
+
+    for pv_title in ["Public Order Offence", "Trespass"]:
+        v = pv.get(pv_title)
+        if v:
+            inc2.potential_violations.append(v)
+
+    inc2.locations.append(lewes)
+
+    for key in ["Protest / Demonstration"]:
+        lbl = label_map.get(key)
+        if lbl:
+            inc2.labels.append(lbl)
+
+    inc2_evt = Event(
+        title="Protesters block Tesco loading bays — Section 35 dispersal order issued",
+        eventtype_id=et.id if et else None,  # Incident
+        from_date=_dt(2026, 3, 18, 13, 0),
+        to_date=_dt(2026, 3, 18, 16, 30),
+        location_id=lewes.id,
+        comments="Police issued Section 35 order. Group dispersed without arrest.",
+    )
+    db.session.add(inc2_evt)
+    db.session.flush()
+    inc2.events.append(inc2_evt)
+
+    # Tesco bulletin 1: X post
+    b_tesco_x = Bulletin()
+    b_tesco_x.title = (
+        "There's a protest at Lewes Tesco rn!! Same lot from the castle I think "
+        "#Lewes #LewesHeritageTrust"
+    )
+    b_tesco_x.sjac_title = "X post: protest at Tesco Lewes car park — 18 Mar 2026"
+    b_tesco_x.description = (
+        "X post by account @lewes_local at 13:22 GMT on 18 March 2026. "
+        "Reports a group of protesters blocking the loading bay entrance of the "
+        "Tesco superstore on Phoenix Causeway. Post includes a photograph showing "
+        "approximately 50–60 people holding placards reading 'Save Meridian House' "
+        "and 'Lewes Heritage Trust'. Police vehicles visible in the background. "
+        "Post received 340 retweets."
+    )
+    b_tesco_x.originid = "tesco-x-18mar2026-1322"
+    b_tesco_x.source_link = "https://x.com/lewes_local/status/9876543210"
+    b_tesco_x.publish_date = _dt(2026, 3, 18, 13, 22)
+    b_tesco_x.documentation_date = _dt(2026, 3, 18, 15, 0)
+    b_tesco_x.reliability_score = 55
+    b_tesco_x.comments = (
+        "Photograph corroborates presence of Lewes Heritage Trust placards — "
+        "same group as castle siege. Account @lewes_local has 1.2k followers, "
+        "no prior history of misinformation."
+    )
+    b_tesco_x.status = status_assigned
+    b_tesco_x.user_id = admin.id
+    b_tesco_x.assigned_to_id = test_users["user2"].id
+    b_tesco_x.tags = ["Lewes", "Tesco", "protest", "Lewes Heritage Trust", "Meridian House", "day 2"]
+    db.session.add(b_tesco_x)
+    db.session.flush()
+
+    for key in ["Protest / Demonstration"]:
+        lbl = label_map.get(key)
+        if lbl:
+            b_tesco_x.labels.append(lbl)
+    for key in ["Social Media Post", "Outdoor Scene", "Multiple Persons Visible"]:
+        lbl = label_map.get(key)
+        if lbl:
+            b_tesco_x.ver_labels.append(lbl)
+    b_tesco_x.locations.append(lewes)
+    b_tesco_x.sources.append(sources["X (Twitter)"])
+    b_tesco_x.events.append(inc2_evt)
+
+    geo_type_comm2 = GeoLocationType.query.filter_by(title="Commercial/Retail").first()
+    geo_tesco = GeoLocation()
+    geo_tesco.title = "Tesco Lewes — Phoenix Causeway"
+    geo_tesco.latlng = "POINT(0.0147 50.8771)"
+    geo_tesco.type_id = geo_type_comm2.id if geo_type_comm2 else None
+    geo_tesco.main = True
+    geo_tesco.comment = "Tesco superstore car park, Phoenix Causeway. Secondary protest site."
+    geo_tesco.bulletin_id = b_tesco_x.id
+    db.session.add(geo_tesco)
+    db.session.flush()
+
+    # Tesco bulletin 2: Albion Broadcasting mention
+    b_tesco_bbc = Bulletin()
+    b_tesco_bbc.title = (
+        "Lewes Castle siege: secondary protest reported at local supermarket"
+    )
+    b_tesco_bbc.sjac_title = "Albion Broadcasting: secondary protest at Tesco Lewes — 18 Mar 2026"
+    b_tesco_bbc.description = (
+        "Albion Broadcasting online article published at 19:10 GMT on 18 March 2026, "
+        "as part of its ongoing coverage of the Lewes Castle siege. A paragraph "
+        "within the article notes that a secondary group of supporters gathered "
+        "at a Lewes supermarket during the afternoon, blocking loading bays before "
+        "dispersing following a police order. No arrests were made. The article "
+        "identifies the group as affiliated with the Lewes Heritage Trust."
+    )
+    b_tesco_bbc.originid = "albion-lewes-tesco-protest-18mar2026"
+    b_tesco_bbc.source_link = "https://www.albionbroadcasting.co.uk/news/uk-england-sussex-lewes-castle-18mar2026"
+    b_tesco_bbc.publish_date = _dt(2026, 3, 18, 19, 10)
+    b_tesco_bbc.documentation_date = _dt(2026, 3, 18, 21, 0)
+    b_tesco_bbc.reliability_score = 75
+    b_tesco_bbc.comments = (
+        "Credible national source. Only a brief mention — not the article's focus. "
+        "Corroborates X post and confirms no arrests and police dispersal."
+    )
+    b_tesco_bbc.status = status_assigned
+    b_tesco_bbc.user_id = admin.id
+    b_tesco_bbc.assigned_to_id = test_users["user3"].id
+    b_tesco_bbc.tags = ["Lewes", "Tesco", "protest", "Albion Broadcasting", "Lewes Heritage Trust", "day 2"]
+    db.session.add(b_tesco_bbc)
+    db.session.flush()
+
+    for key in ["Protest / Demonstration"]:
+        lbl = label_map.get(key)
+        if lbl:
+            b_tesco_bbc.labels.append(lbl)
+    for key in ["Priority"]:
+        lbl = label_map.get(key)
+        if lbl:
+            b_tesco_bbc.ver_labels.append(lbl)
+    b_tesco_bbc.locations.append(lewes)
+    b_tesco_bbc.sources.append(sources["Albion Broadcasting"])
+    b_tesco_bbc.events.append(inc2_evt)
+
+    pub_evt_tesco_bbc = Event(
+        title="Albion Broadcasting reports secondary protest at Tesco Lewes",
+        eventtype_id=et_pub.id if et_pub else None,  # Publication
+        from_date=_dt(2026, 3, 18, 19, 10),
+        to_date=_dt(2026, 3, 18, 19, 10),
+        location_id=lewes.id,
+    )
+    db.session.add(pub_evt_tesco_bbc)
+    db.session.flush()
+    b_tesco_bbc.events.append(pub_evt_tesco_bbc)
+
+    geo_tesco_bbc = GeoLocation()
+    geo_tesco_bbc.title = "Tesco Lewes — Phoenix Causeway"
+    geo_tesco_bbc.latlng = "POINT(0.0147 50.8771)"
+    geo_tesco_bbc.type_id = geo_type_comm2.id if geo_type_comm2 else None
+    geo_tesco_bbc.main = False
+    geo_tesco_bbc.comment = "Tesco superstore car park, Phoenix Causeway. Secondary protest site."
+    geo_tesco_bbc.bulletin_id = b_tesco_bbc.id
+    db.session.add(geo_tesco_bbc)
+    db.session.flush()
+
+    # Kieran Moss actor-to-bulletin links (Tesco bulletins)
+    atob_m1 = Atob(actor_id=a3.id, bulletin_id=b_tesco_x.id)
+    atob_m1.related_as = [4]  # Appeared
+    atob_m1.probability = 2  # Certain
+    atob_m1.comment = "Moss identifiable at the front of the Tesco protest group in X post image."
+    atob_m1.user_id = admin.id
+    db.session.add(atob_m1)
+
+    atob_m2 = Atob(actor_id=a3.id, bulletin_id=b_tesco_bbc.id)
+    atob_m2.related_as = [4]  # Appeared
+    atob_m2.probability = 1  # Probable
+    atob_m2.comment = "Albion Broadcasting article corroborates protest; Moss likely present but not named."
+    atob_m2.user_id = admin.id
+    db.session.add(atob_m2)
+    db.session.flush()
+
+    # Itob links for Tesco incident
+    for new_b, rel_type, prob, comment in [
+        (b_tesco_x, 2, 1, "X post is primary visual evidence of the Tesco protest."),
+        (b_tesco_bbc, 3, 1, "Albion Broadcasting corroborates the protest and confirms no arrests."),
+    ]:
+        db.session.add(Itob(
+            incident_id=inc2.id,
+            bulletin_id=new_b.id,
+            related_as=rel_type,
+            probability=prob,
+            comment=comment,
+            user_id=admin.id,
+        ))
+    db.session.flush()
+
+    # Kieran Moss → Incident 2 (Participant, Probable)
+    itoa_m = Itoa(actor_id=a3.id, incident_id=inc2.id)
+    itoa_m.related_as = [5]  # Participant
+    itoa_m.probability = 1  # Probable
+    itoa_m.comment = "Moss identified at the Tesco protest scene; believed to have led the group."
+    itoa_m.user_id = admin.id
+    db.session.add(itoa_m)
+    db.session.flush()
+
+    # Incident-to-Incident link (castle siege ↔ Tesco protest)
+    # Constraint: incident_id < related_incident_id, so inc.id (1) < inc2.id (2)
+    itoi = Itoi(incident_id=inc.id, related_incident_id=inc2.id)
+    itoi.related_as = 4  # Related
+    itoi.probability = 1  # Likely
+    itoi.comment = "Tesco protest occurred on day 2 of the siege — same group, same day."
+    itoi.user_id = admin.id
+    db.session.add(itoi)
+    db.session.flush()
+
+    # ── Incident 3: Criminal damage — Meridian House site ───────────
+    b_lw1 = Bulletin()
+    b_lw1.title = "Police investigating criminal damage at Meridian House demolition site"
+    b_lw1.sjac_title = "Lewes & Weald Constabulary: criminal damage at Meridian House site — 22 Mar 2026"
+    b_lw1.description = (
+        "Press release published by Lewes & Weald Constabulary at 09:15 GMT on "
+        "22 March 2026. Officers were called at 06:15 to the Meridian House "
+        "demolition site on the Harvey's Brewery site, Lewes, following a report "
+        "of criminal damage. On arrival, officers found two excavators with slashed "
+        "tyres and protest slogans spray-painted on site hoarding. CCTV cameras "
+        "mounted on the hoarding had been obscured with spray paint prior to the "
+        "damage, suggesting premeditation. The site had been secured by contractors "
+        "the previous afternoon (21 March) in preparation for demolition preparatory "
+        "works. No arrests have been made. Lewes & Weald Constabulary are appealing "
+        "for witnesses and have opened a criminal damage investigation under reference "
+        "CRN/2026/LEW/00389. Anyone with information is asked to call 101."
+    )
+    b_lw1.originid = "lwc-meridian-damage-22mar2026"
+    b_lw1.source_link = "https://www.leweswealdconstabulary.police.uk/news/meridian-house-criminal-damage-22mar2026"
+    b_lw1.publish_date = _dt(2026, 3, 22, 9, 15)
+    b_lw1.documentation_date = _dt(2026, 3, 24, 10, 0)
+    b_lw1.reliability_score = 90
+    b_lw1.comments = (
+        "Official police source. First documentation of this incident. "
+        "Obscuring of CCTV prior to damage indicates planning. "
+        "Reference number noted for cross-referencing with future arrest records."
+    )
+    b_lw1.status = status_assigned
+    b_lw1.user_id = admin.id
+    b_lw1.assigned_to_id = test_users["user3"].id
+    b_lw1.tags = ["Meridian House", "criminal damage", "Lewes & Weald Constabulary", "construction site", "Harvey's Brewery"]
+    db.session.add(b_lw1)
+    db.session.flush()
+
+    for key in ["Property Damage Alleged"]:
+        lbl = label_map.get(key)
+        if lbl:
+            b_lw1.labels.append(lbl)
+    for key in ["Priority"]:
+        lbl = label_map.get(key)
+        if lbl:
+            b_lw1.ver_labels.append(lbl)
+    b_lw1.locations.append(lewes)
+    b_lw1.sources.append(sources["Lewes & Weald Constabulary"])
+
+    geo_meridian2 = GeoLocation()
+    geo_meridian2.title = "Meridian House demolition site"
+    geo_meridian2.latlng = "POINT(0.01664 50.87484)"
+    geo_meridian2.type_id = geo_type_comm.id if geo_type_comm else None
+    geo_meridian2.main = True
+    geo_meridian2.comment = "Harvey's Brewery site. Excavators damaged, hoarding spray-painted, CCTV obscured."
+    geo_meridian2.bulletin_id = b_lw1.id
+    db.session.add(geo_meridian2)
+    db.session.flush()
+
+    inc3_evt = Event(
+        title="Construction equipment vandalized at Meridian House site",
+        eventtype_id=et.id if et else None,  # Incident
+        from_date=_dt(2026, 3, 22, 2, 0),
+        to_date=_dt(2026, 3, 22, 4, 0),
+        location_id=meridian_house.id,
+        estimated=True,
+    )
+    db.session.add(inc3_evt)
+    db.session.flush()
+    b_lw1.events.append(inc3_evt)
+
+    b_lw2 = Bulletin()
+    b_lw2.title = "Demolition site targeted by vandals days after Lewes Castle siege"
+    b_lw2.sjac_title = "Lewes Clarion: criminal damage at Meridian House site — 22 Mar 2026"
+    b_lw2.description = (
+        "Lewes Clarion online article published at 13:45 GMT on 22 March 2026. "
+        "Reports that the Meridian House demolition site on the Harvey's Brewery "
+        "site was targeted by vandals in the early hours of 22 March. The article "
+        "describes slashed tyres on two excavators and slogans including 'Heritage "
+        "Not Rubble' and 'Meridian Lives' spray-painted on site hoarding. The "
+        "article quotes the lead contractor, Apex Build Group, confirming the "
+        "damage and estimating repair and replacement costs of approximately £18,000. "
+        "The Lewes Clarion notes the damage occurred three days after seven people "
+        "were arrested in connection with the castle occupation and draws an "
+        "editorial connection to the Lewes Heritage Trust campaign, though no "
+        "group has claimed responsibility. Lewes & Weald Constabulary declined "
+        "to confirm whether the damage is being treated as connected to the siege."
+    )
+    b_lw2.originid = "lc-meridian-damage-22mar2026"
+    b_lw2.source_link = "https://www.lewesclarion.co.uk/news/lewes/meridian-house-vandalism-march-2026"
+    b_lw2.publish_date = _dt(2026, 3, 22, 13, 45)
+    b_lw2.documentation_date = _dt(2026, 3, 24, 11, 0)
+    b_lw2.reliability_score = 65
+    b_lw2.comments = (
+        "Local source. Contractor cost estimate (£18,000) is unverified. "
+        "Editorial inference linking damage to Lewes Heritage Trust is speculative "
+        "— no group has claimed responsibility. Useful for corroborating the "
+        "police account and for the 'Heritage Not Rubble' slogan detail."
+    )
+    b_lw2.status = status_assigned
+    b_lw2.user_id = admin.id
+    b_lw2.assigned_to_id = test_users["user1"].id
+    b_lw2.tags = ["Meridian House", "criminal damage", "Lewes Clarion", "construction site", "vandalism", "Apex Build Group"]
+    db.session.add(b_lw2)
+    db.session.flush()
+
+    for key in ["Property Damage Alleged"]:
+        lbl = label_map.get(key)
+        if lbl:
+            b_lw2.labels.append(lbl)
+    for key in ["Priority"]:
+        lbl = label_map.get(key)
+        if lbl:
+            b_lw2.ver_labels.append(lbl)
+    b_lw2.locations.append(lewes)
+    b_lw2.sources.append(sources["Lewes Clarion"])
+
+    geo_meridian3 = GeoLocation()
+    geo_meridian3.title = "Meridian House demolition site"
+    geo_meridian3.latlng = "POINT(0.01664 50.87484)"
+    geo_meridian3.type_id = geo_type_comm.id if geo_type_comm else None
+    geo_meridian3.main = False
+    geo_meridian3.comment = "Harvey's Brewery site. Scene of criminal damage reported 22 March 2026."
+    geo_meridian3.bulletin_id = b_lw2.id
+    db.session.add(geo_meridian3)
+    db.session.flush()
+
+    b_lw2.events.append(inc3_evt)
+
+    inc3 = Incident()
+    inc3.title = "Criminal damage to construction equipment — Meridian House site, Lewes, 22 March 2026"
+    inc3.description = (
+        "In the early hours of 22 March 2026, persons unknown entered the "
+        "Meridian House demolition site at the Harvey's Brewery site in Lewes. "
+        "Two excavators had their tyres slashed and protest slogans — including "
+        "'Heritage Not Rubble' and 'Meridian Lives' — were spray-painted on site "
+        "hoarding. CCTV cameras had been obscured with spray paint prior to the "
+        "damage, indicating premeditation. The site had been secured by contractors "
+        "the previous afternoon in preparation for demolition preparatory works. "
+        "Lewes & Weald Constabulary opened a criminal damage investigation "
+        "(CRN/2026/LEW/00389). No arrests have been made. No group has claimed "
+        "responsibility. The incident occurred three days after seven people were "
+        "arrested in connection with the Lewes Castle occupation."
+    )
+    inc3.status = status_assigned
+    inc3.assigned_to_id = test_users["user1"].id
+    inc3.first_peer_reviewer_id = test_users["user3"].id
+    inc3.second_peer_reviewer_id = test_users["user2"].id
+    inc3.comments = (
+        "Perpetrators unknown. No direct evidence linking this to Thomas Ashdown "
+        "or any named individual — Ashdown was on bail at the time. The premeditated "
+        "CCTV obstruction suggests familiarity with the site. Possible connection "
+        "to Lewes Heritage Trust but unconfirmed. Flagged as potentially linked to "
+        "Incident 1 via itoi (Led to) — requires further evidence to confirm."
+    )
+    db.session.add(inc3)
+    db.session.flush()
+
+    pv_cd = PotentialViolation.query.filter_by(title="Criminal Damage").first()
+    if pv_cd:
+        inc3.potential_violations.append(pv_cd)
+    inc3.locations.append(lewes)
+
+    db.session.add(Itob(
+        incident_id=inc3.id,
+        bulletin_id=b_lw1.id,
+        related_as=2,  # Primary Evidence
+        probability=2,  # Certain
+        comment="Official police report is the primary evidence source for this incident.",
+        user_id=admin.id,
+    ))
+    db.session.add(Itob(
+        incident_id=inc3.id,
+        bulletin_id=b_lw2.id,
+        related_as=3,  # Supporting Evidence
+        probability=1,  # Likely
+        comment="Lewes Clarion corroborates the police account and adds contractor cost estimate and slogan detail.",
+        user_id=admin.id,
+    ))
+    db.session.flush()
+
+    # inc → Led to → inc3 (constraint: incident_id < related_incident_id)
+    db.session.add(Itoi(
+        incident_id=inc.id,
+        related_incident_id=inc3.id,
+        related_as=3,  # Led to
+        probability=1,  # Likely
+        comment="Castle siege publicly identified the Meridian House site as the target; damage followed three days after clearance.",
+        user_id=admin.id,
+    ))
+    db.session.flush()
+
+    # ── Actor-to-Actor relationships ─────────────────────────────────
+    # Constraint: actor_id < related_actor_id
+    # a.id=1, a2.id=2, a3.id=3
+
+    # Ashdown ↔ Pemberton: Associate, Certain (both named organisers of Lewes Heritage Trust)
+    atoa_ap = Atoa(actor_id=a.id, related_actor_id=a2.id)
+    atoa_ap.related_as = 9  # Associate
+    atoa_ap.probability = 2  # Certain
+    atoa_ap.comment = "Both named by The National Courier as leaders of the Lewes Heritage Trust occupation."
+    atoa_ap.user_id = admin.id
+    db.session.add(atoa_ap)
+
+    # Ashdown ↔ Moss: Associate, Probable (connected via Lewes Heritage Trust)
+    atoa_am = Atoa(actor_id=a.id, related_actor_id=a3.id)
+    atoa_am.related_as = 9  # Associate
+    atoa_am.probability = 1  # Probable
+    atoa_am.comment = "Moss identified as a Lewes Heritage Trust volunteer; likely known to Ashdown."
+    atoa_am.user_id = admin.id
+    db.session.add(atoa_am)
+
+    # Pemberton ↔ Moss: Associate, Probable (connected via Lewes Heritage Trust)
+    atoa_pm = Atoa(actor_id=a2.id, related_actor_id=a3.id)
+    atoa_pm.related_as = 9  # Associate
+    atoa_pm.probability = 1  # Probable
+    atoa_pm.comment = "Both connected to Lewes Heritage Trust; Pemberton as Chair, Moss as volunteer."
+    atoa_pm.user_id = admin.id
+    db.session.add(atoa_pm)
+
     db.session.flush()
 
     # ── Media (Lewes Castle photo — stand-in for X post image) ─────
@@ -1028,20 +2227,49 @@ def seed_minimal():
     elif not src_file.exists():
         print(f"  Warning: {src_file} not found — no media attached")
 
+    # ── Apply OVRM ID values to all bulletins ────────────────────────
+    ovrm_ids = {
+        b_pre:       "OVRM/2026/B/001",
+        b:           "OVRM/2026/B/002",
+        b_fb:        "OVRM/2026/B/003",
+        b_ig:        "OVRM/2026/B/004",
+        b_tt:        "OVRM/2026/B/005",
+        b_ew:        "OVRM/2026/B/006",
+        b_bbc:       "OVRM/2026/B/007",
+        b_sp:        "OVRM/2026/B/008",
+        b_grdn:      "OVRM/2026/B/009",
+        b_sp2:       "OVRM/2026/B/010",
+        b_tesco_x:   "OVRM/2026/B/011",
+        b_tesco_bbc: "OVRM/2026/B/012",
+        b_lw1:       "OVRM/2026/B/013",
+        b_lw2:       "OVRM/2026/B/014",
+    }
+    for bulletin, ovrm_id_val in ovrm_ids.items():
+        DynamicField.apply_values(bulletin, {"ovrm_id": ovrm_id_val})
+
     db.session.commit()
 
     print("Minimal demo data seeded successfully!")
-    print(f"  Test users: user1/user1pass, user2/user2pass, user3/user3pass")
+    print(f"  Test users: user1/user1pass (Analyst One), user2/user2pass (Analyst Two), user3/user3pass (Analyst Three)")
     print(f"  Sources:    {len(source_titles)} ({', '.join(source_titles)})")
-    print(f"  Locations:  3 (East Sussex → Lewes → Lewes Castle)")
-    print(f"  Actors:     1 (Thomas Ashdown)")
-    print(f"  Bulletins:  5")
+    print(f"  Locations:  4 (East Sussex → Lewes → Lewes Castle, Meridian House)")
+    print(f"  Actors:     3 (Thomas Ashdown | Rachel Pemberton | Kieran Moss)")
+    print(f"  Bulletins:  14 (OVRM/2026/B/001–014, OVRM ID field set)")
+    print(f"    - Lewes Clarion: council approves Meridian House demolition — 3 Mar (assigned user1, context)")
     print(f"    - X post (assigned user1)")
     print(f"    - Facebook caption (assigned user2)")
     print(f"    - Instagram caption (assigned user3)")
     print(f"    - TikTok caption (assigned user1)")
     print(f"    - Eyewitness statement / Margaret Okafor (assigned user2)")
-    print(f"  Incidents:  1 (Siege of Lewes Castle)")
+    print(f"    - Albion Broadcasting article: day 2 (assigned user3)")
+    print(f"    - Lewes & Weald Constabulary statement: day 2 (assigned user1)")
+    print(f"    - The National Courier article: day 3 (assigned user2)")
+    print(f"    - Lewes & Weald Constabulary statement: day 3 (assigned user3)")
+    print(f"    - X post: Tesco Lewes car park protest (assigned user2)")
+    print(f"    - Albion Broadcasting: Tesco protest mention (assigned user3)")
+    print(f"    - Lewes & Weald Constabulary: criminal damage at Meridian House (assigned user3)")
+    print(f"    - Lewes Clarion: criminal damage at Meridian House (assigned user1)")
+    print(f"  Incidents:  3 (Lewes Castle occupation | Phoenix Causeway assembly | Meridian House criminal damage)")
     print(f"  Media:      1 (castle photo)")
     return True
 

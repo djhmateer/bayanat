@@ -31,3 +31,4 @@ cookies.txt
 
 *.egg-info/
 secrets/
+celerybeat-schedule*
