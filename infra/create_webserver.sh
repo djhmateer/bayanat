@@ -274,9 +274,14 @@ uv run flask import-data
 
 ## DAILY DEV
 
+uv sync --upgrade     
+
 uv run flask run
 
 uv run python sample_data/sample_data_minimal_reset.py
 
 # so can run bulk updates
 uv run celery -A enferno.tasks worker -B --loglevel=info
+
+# run migrations
+uv run flask db upgrade 

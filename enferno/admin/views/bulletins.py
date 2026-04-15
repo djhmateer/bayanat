@@ -72,6 +72,7 @@ def api_bulletins(validated_data: dict) -> Response:
         selectinload(Bulletin.assigned_to),
         selectinload(Bulletin.first_peer_reviewer),
         selectinload(Bulletin.roles),
+        selectinload(Bulletin.labels),
     )
 
     if include_count and cursor is None:
@@ -159,6 +160,7 @@ def api_bulletins(validated_data: dict) -> Response:
                     ),
                     "_status": item.status,
                     "review_action": item.review_action,
+                    "labels": [{"id": l.id, "title": l.title} for l in item.labels],
                 }
             )
         else:

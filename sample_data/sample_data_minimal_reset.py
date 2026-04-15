@@ -36,11 +36,12 @@ Label table:
     label table is wiped by clear_all_content().  They are created inside
     seed_minimal() rather than replace_reference_data() for that reason.
 
-    Two categories of label (controlled by Label.verified):
-      Unverified (verified=False)  — descriptive, allegation-based;
-                                     applied during initial triage
-      Verified   (verified=True)   — neutral, evidence-based;
-                                     applied during peer review
+    Labels are organised in two groups:
+      Classification labels  — descriptive, allegation-based (Protest /
+                               Demonstration, Siege / Occupation, etc.)
+      Investigation labels   — hierarchical tree rooted at "Investigations",
+                               e.g. Investigations > Lewes Castle Siege >
+                               Precursor / Protest / Assembly / Arrests
 
 TRUNCATE vs ORM delete:
     clear_all_content() uses raw "TRUNCATE … CASCADE" rather than ORM
@@ -101,12 +102,13 @@ WHAT THIS SCRIPT DOES (in order)
                           → Brighton
                           → Eastbourne
                           → Hastings
-   Labels          13  7 verified (neutral, evidence-based) +
-                       6 unverified (descriptive, allegation-based)
+   Labels           9  6 classification labels (Protest, Siege, etc.) +
+                       3 investigation labels (Investigations > Lewes Castle
+                       Siege, Brighton Dome Rally)
    Actors           1  Fictional: "Thomas Ashdown" — photographed in crowd
    Bulletins        5  X post, Facebook caption, Instagram caption, TikTok
                        caption, eyewitness statement (Margaret Okafor) —
-                       each with labels, verified labels, tags;
+                       each with labels and investigation tags;
                        X post also has event and map pin
    Incident         1  "Siege of Lewes Castle (17 March 2026)"
    Atob link        1  Ashdown ↔ bulletin (Appeared)
@@ -509,6 +511,8 @@ def seed_minimal():
         "Witness Statement",
         "TikTok",
         "Lewes Clarion",
+        "The Argus",
+        "Sussex Police",
     ]
     sources = {}
     for title in source_titles:
@@ -643,6 +647,18 @@ def seed_minimal():
     brighton.full_location = "Brighton, East Sussex"
     brighton.id_tree = f"[{brighton.id}] [{east_sussex.id}]"
 
+    brighton_dome = Location(
+        title="Brighton Dome",
+        location_type_id=loc_type_poi.id if loc_type_poi else None,
+        country_id=uk.id if uk else None,
+        parent_id=brighton.id,
+    )
+    brighton_dome.latlng = from_shape(Point(-0.1390, 50.8237), srid=4326)
+    db.session.add(brighton_dome)
+    db.session.flush()
+    brighton_dome.full_location = "Brighton Dome, Brighton, East Sussex"
+    brighton_dome.id_tree = f"[{brighton_dome.id}] [{brighton.id}] [{east_sussex.id}]"
+
     eastbourne.full_location = "Eastbourne, East Sussex"
     eastbourne.id_tree = f"[{eastbourne.id}] [{east_sussex.id}]"
 
@@ -663,61 +679,32 @@ def seed_minimal():
 
     db.session.flush()
 
-    # ── Labels (seed a small set — the label table was truncated) ──
+    # ── Labels ─────────────────────────────────────────────────────────
+    # Investigation labels: hierarchical tree for organising content by case.
     #
-    # Unverified labels (verified=False):
-    #   Descriptive labels based on observations and source allegations.
-    #   Applied during initial triage — what the source claims or what the
-    #   content appears to depict at first glance.
-    #
-    # Verified labels (verified=True):
-    #   Neutral labels based on analyst observation and evidence.
-    #   Applied during peer review — objective, factual classifications
-    #   confirmed by an analyst reviewing the material.
-    #
-    label_defs = [
-        # ── Verified labels (neutral, evidence-based) ────────────────
-        {"title": "Image", "order": 100, "verified": True,
-         "for_bulletin": True, "for_actor": False, "for_incident": False},
-        {"title": "Social Media Post", "order": 101, "verified": True,
-         "for_bulletin": True, "for_actor": False, "for_incident": False},
-        {"title": "Outdoor Scene", "order": 102, "verified": True,
-         "for_bulletin": True, "for_actor": False, "for_incident": False},
-        {"title": "Multiple Persons Visible", "order": 103, "verified": True,
-         "for_bulletin": True, "for_actor": False, "for_incident": False},
-        {"title": "Historic Structure Visible", "order": 104, "verified": True,
-         "for_bulletin": True, "for_actor": False, "for_incident": False},
-        {"title": "Priority", "order": 105, "verified": True,
-         "for_bulletin": True, "for_actor": True, "for_incident": True},
-        {"title": "Graphic Content", "order": 106, "verified": True,
-         "for_bulletin": True, "for_actor": True, "for_incident": True},
-        # ── Unverified labels (descriptive, allegation-based) ────────
-        {"title": "Protest / Demonstration", "order": 300, "verified": False,
-         "for_bulletin": True, "for_actor": False, "for_incident": True},
-        {"title": "Siege / Occupation", "order": 301, "verified": False,
-         "for_bulletin": True, "for_actor": False, "for_incident": True},
-        {"title": "Property Damage Alleged", "order": 302, "verified": False,
-         "for_bulletin": True, "for_actor": False, "for_incident": True},
-        {"title": "Crowd / Gathering", "order": 303, "verified": False,
-         "for_bulletin": True, "for_actor": False, "for_incident": True},
-        {"title": "Heritage Site Threatened", "order": 304, "verified": False,
-         "for_bulletin": True, "for_actor": False, "for_incident": True},
-        {"title": "Trespass Alleged", "order": 305, "verified": False,
-         "for_bulletin": True, "for_actor": False, "for_incident": True},
-    ]
     label_map = {}
-    for ldef in label_defs:
-        lbl = Label(
-            title=ldef["title"],
-            order=ldef["order"],
-            verified=ldef["verified"],
-            for_bulletin=ldef["for_bulletin"],
-            for_actor=ldef["for_actor"],
-            for_incident=ldef["for_incident"],
-        )
-        db.session.add(lbl)
-        db.session.flush()
-        label_map[ldef["title"]] = lbl
+
+    # ── Investigation labels (hierarchical) ──────────────────────────
+    # Parent
+    inv_parent = Label(title="Investigations", order=1, verified=False,
+                       for_bulletin=True, for_actor=True, for_incident=True)
+    db.session.add(inv_parent)
+    db.session.flush()
+    label_map["Investigations"] = inv_parent
+
+    # Children of Investigations
+    inv_lewes = Label(title="Lewes Castle Siege", order=2, verified=False,
+                      parent_label_id=inv_parent.id,
+                      for_bulletin=True, for_actor=True, for_incident=True)
+    inv_brighton = Label(title="Brighton Dome Rally", order=3, verified=False,
+                         parent_label_id=inv_parent.id,
+                         for_bulletin=True, for_actor=True, for_incident=True)
+    db.session.add(inv_lewes)
+    db.session.add(inv_brighton)
+    db.session.flush()
+    label_map["Lewes Castle Siege"] = inv_lewes
+    label_map["Brighton Dome Rally"] = inv_brighton
+
 
     # ── Actor ───────────────────────────────────────────────────────
     a = Actor()
@@ -749,7 +736,7 @@ def seed_minimal():
     a.assigned_to_id = test_users["user2"].id
     a.first_peer_reviewer_id = test_users["user3"].id
     a.second_peer_reviewer_id = test_users["user1"].id
-    a.tags = ["suspect", "lewes resident", "organiser", "arrested", "charged", "lewes heritage trust"]
+    a.tags = []
     a.id_number = [
         {"type": "7", "number": "CRN/2026/LEW/00312"},
         {"type": "4", "number": "T20261234"},
@@ -784,10 +771,7 @@ def seed_minimal():
     profile.documentation_date = _dt(2026, 3, 19, 20, 0)
     profile.sources.append(sources["X (Twitter)"])
     profile.sources.append(sources["The National Courier"])
-    for key in ["Priority"]:
-        lbl = label_map.get(key)
-        if lbl:
-            profile.ver_labels.append(lbl)
+    profile.labels.append(label_map["Lewes Castle Siege"])
     db.session.add(profile)
 
     # ── Actor events ────────────────────────────────────────────────
@@ -841,7 +825,7 @@ def seed_minimal():
     a2.assigned_to_id = test_users["user1"].id
     a2.first_peer_reviewer_id = test_users["user2"].id
     a2.second_peer_reviewer_id = test_users["user3"].id
-    a2.tags = ["arrested", "chair", "lewes heritage trust", "lewes resident", "bail"]
+    a2.tags = []
     a2.id_number = [{"type": "7", "number": "CRN/2026/LEW/00313"}]
     db.session.add(a2)
     db.session.flush()
@@ -869,10 +853,7 @@ def seed_minimal():
     profile2.documentation_date = _dt(2026, 3, 23, 9, 0)
     profile2.sources.append(sources["The National Courier"])
     profile2.sources.append(sources["Witness Statement"])
-    for key in ["Priority"]:
-        lbl = label_map.get(key)
-        if lbl:
-            profile2.ver_labels.append(lbl)
+    profile2.labels.append(label_map["Lewes Castle Siege"])
     db.session.add(profile2)
 
     a2_evt_arrested = Event(
@@ -921,7 +902,7 @@ def seed_minimal():
     a3.status = status_assigned
     a3.assigned_to_id = test_users["user2"].id
     a3.first_peer_reviewer_id = test_users["user1"].id
-    a3.tags = ["phoenix causeway", "tesco protest", "lewes heritage trust", "unconfirmed", "not arrested"]
+    a3.tags = []
     a3.id_number = []
     db.session.add(a3)
     db.session.flush()
@@ -948,6 +929,7 @@ def seed_minimal():
     profile3.publish_date = _dt(2026, 3, 18, 13, 4)
     profile3.documentation_date = _dt(2026, 3, 24, 14, 0)
     profile3.sources.append(sources["X (Twitter)"])
+    profile3.labels.append(label_map["Lewes Castle Siege"])
     db.session.add(profile3)
 
     # ── Event type lookups (used throughout bulletin/incident creation)
@@ -994,14 +976,11 @@ def seed_minimal():
     b_pre.status = status_assigned
     b_pre.user_id = admin.id
     b_pre.assigned_to_id = test_users["user1"].id
-    b_pre.tags = ["Lewes", "Meridian House", "Lewes Heritage Trust", "planning", "demolition", "pre-incident", "Lewes Clarion"]
+    b_pre.tags = []
     db.session.add(b_pre)
     db.session.flush()
 
-    for key in ["Protest / Demonstration", "Heritage Site Threatened"]:
-        lbl = label_map.get(key)
-        if lbl:
-            b_pre.labels.append(lbl)
+    b_pre.labels.append(label_map["Lewes Castle Siege"])
     b_pre.locations.append(lewes)
     b_pre.sources.append(sources["Lewes Clarion"])
 
@@ -1054,28 +1033,11 @@ def seed_minimal():
     b.status = status_assigned
     b.user_id = admin.id
     b.assigned_to_id = user1.id
-    b.tags = [
-        "Lewes", "castle siege", "protest", "crowd", "X post",
-        "East Sussex", "open source",
-    ]
+    b.tags = []
     db.session.add(b)
     db.session.flush()
 
-    # Unverified labels: descriptive, based on what the source alleges or
-    # what the content appears to show at first glance
-    for key in ["Crowd / Gathering", "Heritage Site Threatened",
-                "Siege / Occupation", "Protest / Demonstration"]:
-        lbl = label_map.get(key)
-        if lbl:
-            b.labels.append(lbl)
-
-    # Verified labels: neutral, factual classifications confirmed by an
-    # analyst reviewing the material
-    for key in ["Social Media Post", "Image", "Outdoor Scene",
-                "Multiple Persons Visible", "Historic Structure Visible", "Priority"]:
-        lbl = label_map.get(key)
-        if lbl:
-            b.ver_labels.append(lbl)
+    b.labels.append(label_map["Lewes Castle Siege"])
 
     b.locations.append(castle)
     b.sources.append(src)
@@ -1147,18 +1109,11 @@ def seed_minimal():
     b_fb.status = status_assigned
     b_fb.user_id = admin.id
     b_fb.assigned_to_id = test_users["user2"].id
-    b_fb.tags = ["Lewes", "castle siege", "Facebook", "eyewitness", "crowd", "East Sussex"]
+    b_fb.tags = []
     db.session.add(b_fb)
     db.session.flush()
 
-    for key in ["Crowd / Gathering", "Protest / Demonstration"]:
-        lbl = label_map.get(key)
-        if lbl:
-            b_fb.labels.append(lbl)
-    for key in ["Image", "Social Media Post", "Outdoor Scene", "Multiple Persons Visible"]:
-        lbl = label_map.get(key)
-        if lbl:
-            b_fb.ver_labels.append(lbl)
+    b_fb.labels.append(label_map["Lewes Castle Siege"])
     b_fb.locations.append(castle)
     b_fb.sources.append(sources["Facebook"])
     b_fb.events.append(evt)
@@ -1207,19 +1162,11 @@ def seed_minimal():
     b_ig.status = status_assigned
     b_ig.user_id = admin.id
     b_ig.assigned_to_id = test_users["user3"].id
-    b_ig.tags = ["Lewes", "castle siege", "Instagram", "aerial view", "smoke", "East Sussex", "heritage"]
+    b_ig.tags = []
     db.session.add(b_ig)
     db.session.flush()
 
-    for key in ["Siege / Occupation", "Heritage Site Threatened", "Property Damage Alleged"]:
-        lbl = label_map.get(key)
-        if lbl:
-            b_ig.labels.append(lbl)
-    for key in ["Image", "Social Media Post", "Outdoor Scene", "Multiple Persons Visible",
-                "Historic Structure Visible", "Priority"]:
-        lbl = label_map.get(key)
-        if lbl:
-            b_ig.ver_labels.append(lbl)
+    b_ig.labels.append(label_map["Lewes Castle Siege"])
     b_ig.locations.append(castle)
     b_ig.sources.append(sources["Instagram"])
     b_ig.events.append(evt)
@@ -1253,19 +1200,11 @@ def seed_minimal():
     b_tt.status = status_assigned
     b_tt.user_id = admin.id
     b_tt.assigned_to_id = test_users["user1"].id
-    b_tt.tags = ["Lewes", "castle siege", "TikTok", "interior", "video", "breach", "stonework damage"]
+    b_tt.tags = []
     db.session.add(b_tt)
     db.session.flush()
 
-    for key in ["Siege / Occupation", "Property Damage Alleged", "Trespass Alleged"]:
-        lbl = label_map.get(key)
-        if lbl:
-            b_tt.labels.append(lbl)
-    for key in ["Social Media Post", "Outdoor Scene", "Multiple Persons Visible",
-                "Historic Structure Visible", "Priority", "Graphic Content"]:
-        lbl = label_map.get(key)
-        if lbl:
-            b_tt.ver_labels.append(lbl)
+    b_tt.labels.append(label_map["Lewes Castle Siege"])
     b_tt.locations.append(castle)
     b_tt.sources.append(sources["TikTok"])
     b_tt.events.append(evt)
@@ -1316,18 +1255,11 @@ def seed_minimal():
     b_ew.status = status_assigned
     b_ew.user_id = admin.id
     b_ew.assigned_to_id = test_users["user2"].id
-    b_ew.tags = ["Lewes", "witness statement", "castle siege", "gate breach", "keep damage", "police statement"]
+    b_ew.tags = []
     db.session.add(b_ew)
     db.session.flush()
 
-    for key in ["Siege / Occupation", "Property Damage Alleged", "Trespass Alleged"]:
-        lbl = label_map.get(key)
-        if lbl:
-            b_ew.labels.append(lbl)
-    for key in ["Priority"]:
-        lbl = label_map.get(key)
-        if lbl:
-            b_ew.ver_labels.append(lbl)
+    b_ew.labels.append(label_map["Lewes Castle Siege"])
     b_ew.locations.append(castle)
     b_ew.sources.append(sources["Witness Statement"])
 
@@ -1375,18 +1307,11 @@ def seed_minimal():
     b_bbc.status = status_assigned
     b_bbc.user_id = admin.id
     b_bbc.assigned_to_id = test_users["user3"].id
-    b_bbc.tags = ["Lewes", "castle siege", "Albion Broadcasting", "day 2", "police cordon", "negotiations", "East Sussex"]
+    b_bbc.tags = []
     db.session.add(b_bbc)
     db.session.flush()
 
-    for key in ["Siege / Occupation", "Heritage Site Threatened"]:
-        lbl = label_map.get(key)
-        if lbl:
-            b_bbc.labels.append(lbl)
-    for key in ["Social Media Post", "Outdoor Scene", "Priority"]:
-        lbl = label_map.get(key)
-        if lbl:
-            b_bbc.ver_labels.append(lbl)
+    b_bbc.labels.append(label_map["Lewes Castle Siege"])
     b_bbc.locations.append(castle)
     b_bbc.sources.append(sources["Albion Broadcasting"])
 
@@ -1424,18 +1349,11 @@ def seed_minimal():
     b_sp.status = status_assigned
     b_sp.user_id = admin.id
     b_sp.assigned_to_id = test_users["user1"].id
-    b_sp.tags = ["Lewes", "castle siege", "Lewes & Weald Constabulary", "press statement", "day 2", "Section 14"]
+    b_sp.tags = []
     db.session.add(b_sp)
     db.session.flush()
 
-    for key in ["Siege / Occupation", "Protest / Demonstration"]:
-        lbl = label_map.get(key)
-        if lbl:
-            b_sp.labels.append(lbl)
-    for key in ["Priority"]:
-        lbl = label_map.get(key)
-        if lbl:
-            b_sp.ver_labels.append(lbl)
+    b_sp.labels.append(label_map["Lewes Castle Siege"])
     b_sp.locations.append(castle)
     b_sp.sources.append(sources["Lewes & Weald Constabulary"])
 
@@ -1471,18 +1389,11 @@ def seed_minimal():
     b_grdn.status = status_assigned
     b_grdn.user_id = admin.id
     b_grdn.assigned_to_id = test_users["user2"].id
-    b_grdn.tags = ["Lewes", "castle siege", "The National Courier", "day 3", "arrests", "dispersal", "Lewes Heritage Trust"]
+    b_grdn.tags = []
     db.session.add(b_grdn)
     db.session.flush()
 
-    for key in ["Siege / Occupation", "Protest / Demonstration", "Trespass Alleged", "Property Damage Alleged"]:
-        lbl = label_map.get(key)
-        if lbl:
-            b_grdn.labels.append(lbl)
-    for key in ["Social Media Post", "Priority"]:
-        lbl = label_map.get(key)
-        if lbl:
-            b_grdn.ver_labels.append(lbl)
+    b_grdn.labels.append(label_map["Lewes Castle Siege"])
     b_grdn.locations.append(castle)
     b_grdn.sources.append(sources["The National Courier"])
 
@@ -1519,18 +1430,11 @@ def seed_minimal():
     b_sp2.status = status_assigned
     b_sp2.user_id = admin.id
     b_sp2.assigned_to_id = test_users["user3"].id
-    b_sp2.tags = ["Lewes", "castle siege", "Lewes & Weald Constabulary", "press statement", "day 3", "arrests", "seven arrested"]
+    b_sp2.tags = []
     db.session.add(b_sp2)
     db.session.flush()
 
-    for key in ["Siege / Occupation", "Trespass Alleged", "Property Damage Alleged"]:
-        lbl = label_map.get(key)
-        if lbl:
-            b_sp2.labels.append(lbl)
-    for key in ["Priority"]:
-        lbl = label_map.get(key)
-        if lbl:
-            b_sp2.ver_labels.append(lbl)
+    b_sp2.labels.append(label_map["Lewes Castle Siege"])
     b_sp2.locations.append(castle)
     b_sp2.sources.append(sources["Lewes & Weald Constabulary"])
 
@@ -1613,6 +1517,7 @@ def seed_minimal():
     )
     db.session.add(inc)
     db.session.flush()
+    inc.labels.append(label_map["Lewes Castle Siege"])
 
     # Attach violations to incident
     for pv_title in ["Public Order Offence", "Criminal Damage", "Trespass"]:
@@ -1630,11 +1535,6 @@ def seed_minimal():
 
     inc.locations.append(castle)
 
-    for key in ["Protest / Demonstration", "Property Damage Alleged",
-                "Heritage Site Threatened", "Trespass Alleged"]:
-        lbl = label_map.get(key)
-        if lbl:
-            inc.labels.append(lbl)
 
     # Incident events
     inc_evt = Event(
@@ -1781,6 +1681,7 @@ def seed_minimal():
     )
     db.session.add(inc2)
     db.session.flush()
+    inc2.labels.append(label_map["Lewes Castle Siege"])
 
     for pv_title in ["Public Order Offence", "Trespass"]:
         v = pv.get(pv_title)
@@ -1789,10 +1690,6 @@ def seed_minimal():
 
     inc2.locations.append(lewes)
 
-    for key in ["Protest / Demonstration"]:
-        lbl = label_map.get(key)
-        if lbl:
-            inc2.labels.append(lbl)
 
     inc2_evt = Event(
         title="Protesters block Tesco loading bays — Section 35 dispersal order issued",
@@ -1834,18 +1731,11 @@ def seed_minimal():
     b_tesco_x.status = status_assigned
     b_tesco_x.user_id = admin.id
     b_tesco_x.assigned_to_id = test_users["user2"].id
-    b_tesco_x.tags = ["Lewes", "Tesco", "protest", "Lewes Heritage Trust", "Meridian House", "day 2"]
+    b_tesco_x.tags = []
     db.session.add(b_tesco_x)
     db.session.flush()
 
-    for key in ["Protest / Demonstration"]:
-        lbl = label_map.get(key)
-        if lbl:
-            b_tesco_x.labels.append(lbl)
-    for key in ["Social Media Post", "Outdoor Scene", "Multiple Persons Visible"]:
-        lbl = label_map.get(key)
-        if lbl:
-            b_tesco_x.ver_labels.append(lbl)
+    b_tesco_x.labels.append(label_map["Lewes Castle Siege"])
     b_tesco_x.locations.append(lewes)
     b_tesco_x.sources.append(sources["X (Twitter)"])
     b_tesco_x.events.append(inc2_evt)
@@ -1887,18 +1777,11 @@ def seed_minimal():
     b_tesco_bbc.status = status_assigned
     b_tesco_bbc.user_id = admin.id
     b_tesco_bbc.assigned_to_id = test_users["user3"].id
-    b_tesco_bbc.tags = ["Lewes", "Tesco", "protest", "Albion Broadcasting", "Lewes Heritage Trust", "day 2"]
+    b_tesco_bbc.tags = []
     db.session.add(b_tesco_bbc)
     db.session.flush()
 
-    for key in ["Protest / Demonstration"]:
-        lbl = label_map.get(key)
-        if lbl:
-            b_tesco_bbc.labels.append(lbl)
-    for key in ["Priority"]:
-        lbl = label_map.get(key)
-        if lbl:
-            b_tesco_bbc.ver_labels.append(lbl)
+    b_tesco_bbc.labels.append(label_map["Lewes Castle Siege"])
     b_tesco_bbc.locations.append(lewes)
     b_tesco_bbc.sources.append(sources["Albion Broadcasting"])
     b_tesco_bbc.events.append(inc2_evt)
@@ -2004,18 +1887,11 @@ def seed_minimal():
     b_lw1.status = status_assigned
     b_lw1.user_id = admin.id
     b_lw1.assigned_to_id = test_users["user3"].id
-    b_lw1.tags = ["Meridian House", "criminal damage", "Lewes & Weald Constabulary", "construction site", "Harvey's Brewery"]
+    b_lw1.tags = []
     db.session.add(b_lw1)
     db.session.flush()
 
-    for key in ["Property Damage Alleged"]:
-        lbl = label_map.get(key)
-        if lbl:
-            b_lw1.labels.append(lbl)
-    for key in ["Priority"]:
-        lbl = label_map.get(key)
-        if lbl:
-            b_lw1.ver_labels.append(lbl)
+    b_lw1.labels.append(label_map["Lewes Castle Siege"])
     b_lw1.locations.append(lewes)
     b_lw1.sources.append(sources["Lewes & Weald Constabulary"])
 
@@ -2072,18 +1948,11 @@ def seed_minimal():
     b_lw2.status = status_assigned
     b_lw2.user_id = admin.id
     b_lw2.assigned_to_id = test_users["user1"].id
-    b_lw2.tags = ["Meridian House", "criminal damage", "Lewes Clarion", "construction site", "vandalism", "Apex Build Group"]
+    b_lw2.tags = []
     db.session.add(b_lw2)
     db.session.flush()
 
-    for key in ["Property Damage Alleged"]:
-        lbl = label_map.get(key)
-        if lbl:
-            b_lw2.labels.append(lbl)
-    for key in ["Priority"]:
-        lbl = label_map.get(key)
-        if lbl:
-            b_lw2.ver_labels.append(lbl)
+    b_lw2.labels.append(label_map["Lewes Castle Siege"])
     b_lw2.locations.append(lewes)
     b_lw2.sources.append(sources["Lewes Clarion"])
 
@@ -2127,6 +1996,7 @@ def seed_minimal():
     )
     db.session.add(inc3)
     db.session.flush()
+    inc3.labels.append(label_map["Lewes Castle Siege"])
 
     pv_cd = PotentialViolation.query.filter_by(title="Criminal Damage").first()
     if pv_cd:
@@ -2227,6 +2097,221 @@ def seed_minimal():
     elif not src_file.exists():
         print(f"  Warning: {src_file} not found — no media attached")
 
+    # ═══════════════════════════════════════════════════════════════════
+    # BRIGHTON DOME RALLY — 5 April 2026
+    # Sussex Green Alliance rally at Brighton Dome. ~50 counter-protesters
+    # blocked the main entrance. One arrest: Dylan Kearney, obstruction.
+    # ═══════════════════════════════════════════════════════════════════
+
+    # ── Actor: Dylan Kearney ────────────────────────────────────────
+    a_dk = Actor()
+    a_dk.name = "Dylan Kearney"
+    a_dk.first_name = "Dylan"
+    a_dk.last_name = "Kearney"
+    a_dk.sex = "Male"
+    a_dk.age = "Adult"
+    a_dk.civilian = "Civilian"
+    a_dk.type = "Person"
+    a_dk.occupation = "Barista"
+    a_dk.position = "Organiser, Brighton Climate Justice Network"
+    a_dk.comments = (
+        "Identified in X post image at the front of the counter-protest group "
+        "outside Brighton Dome on 5 April 2026. Arrested at 14:47 GMT for "
+        "obstruction of a public entrance under s.137 Highways Act 1980. "
+        "Released on bail on 6 April. Known to Sussex Police from prior "
+        "climate protest activity."
+    )
+    a_dk.status = status_assigned
+    a_dk.assigned_to_id = test_users["user1"].id
+    a_dk.first_peer_reviewer_id = test_users["user2"].id
+    a_dk.tags = []
+    db.session.add(a_dk)
+    db.session.flush()
+
+    profile_dk = ActorProfile()
+    profile_dk.actor_id = a_dk.id
+    profile_dk.mode = 1
+    profile_dk.description = (
+        "Brighton-based climate activist. Self-describes as 'climate justice "
+        "campaigner'. Active on X as @dylan_climateaction. No prior convictions."
+    )
+    profile_dk.source_link = "https://twitter.com/dylan_climateaction"
+    profile_dk.publish_date = _dt(2026, 4, 5, 14, 47)
+    profile_dk.documentation_date = _dt(2026, 4, 6, 10, 0)
+    profile_dk.sources.append(sources["X (Twitter)"])
+    profile_dk.sources.append(sources["Sussex Police"])
+    profile_dk.labels.append(label_map["Brighton Dome Rally"])
+    db.session.add(profile_dk)
+
+    # ── Bulletins ──────────────────────────────────────────────────
+
+    # Bulletin 1: The Argus article
+    b_argus = Bulletin()
+    b_argus.title = "Protesters block entrance to Brighton Dome climate rally"
+    b_argus.sjac_title = "The Argus: counter-protest at Brighton Dome rally — 5 Apr 2026"
+    b_argus.description = (
+        "The Argus online article published at 16:30 GMT on 5 April 2026. "
+        "Reports that approximately 50 counter-protesters gathered outside "
+        "Brighton Dome during a Sussex Green Alliance climate rally, blocking "
+        "the main entrance on Church Street for around 20 minutes. Police were "
+        "called at 14:30 and a Section 35 dispersal direction was issued under "
+        "the Anti-social Behaviour, Crime and Policing Act 2014. One man, "
+        "named as Dylan Kearney, 28, of Brighton, was arrested on suspicion "
+        "of obstruction of a public entrance. He was released on bail the "
+        "following morning. The Sussex Green Alliance rally continued inside "
+        "the Dome and concluded without further incident."
+    )
+    b_argus.originid = "argus-brighton-dome-rally-05apr2026"
+    b_argus.source_link = "https://www.theargus.co.uk/news/brighton/2026/apr/05/brighton-dome-protest-arrest"
+    b_argus.publish_date = _dt(2026, 4, 5, 16, 30)
+    b_argus.documentation_date = _dt(2026, 4, 6, 9, 0)
+    b_argus.reliability_score = 80
+    b_argus.comments = (
+        "Credible regional newspaper. Names Kearney directly. "
+        "Article quotes a Sussex Police spokesperson — corroborates the police statement."
+    )
+    b_argus.status = status_assigned
+    b_argus.user_id = admin.id
+    b_argus.assigned_to_id = test_users["user2"].id
+    b_argus.tags = []
+    db.session.add(b_argus)
+    db.session.flush()
+    b_argus.labels.append(label_map["Brighton Dome Rally"])
+    b_argus.locations.append(brighton_dome)
+    b_argus.sources.append(sources["The Argus"])
+
+    geo_dome_argus = GeoLocation()
+    geo_dome_argus.title = "Brighton Dome — Church Street entrance"
+    geo_dome_argus.latlng = "POINT(-0.1390 50.8237)"
+    geo_dome_argus.type_id = GeoLocationType.query.filter_by(title="Government Building").first()
+    geo_dome_argus.type_id = geo_dome_argus.type_id.id if geo_dome_argus.type_id else None
+    geo_dome_argus.main = True
+    geo_dome_argus.comment = "Victorian concert hall and conference venue. Counter-protesters blocked Church Street entrance."
+    geo_dome_argus.bulletin_id = b_argus.id
+    db.session.add(geo_dome_argus)
+    db.session.flush()
+
+    # Bulletin 2: X post
+    b_dome_x = Bulletin()
+    b_dome_x.title = "Counter-protesters outside Brighton Dome right now — police just arrived #BrightonDome #ClimateJustice"
+    b_dome_x.sjac_title = "X post: crowd outside Brighton Dome — 5 Apr 2026"
+    b_dome_x.description = (
+        "X post by account @brighton_witness at 14:38 GMT on 5 April 2026. "
+        "Accompanied by a photograph showing approximately 40–50 people "
+        "blocking the Church Street entrance to Brighton Dome, several holding "
+        "placards reading 'No Greenwash' and 'Real Action Now'. Two Sussex "
+        "Police officers visible at the edge of the crowd. Post received "
+        "1,200 retweets before the account was set to protected."
+    )
+    b_dome_x.originid = "x-brighton-dome-protest-05apr2026"
+    b_dome_x.source_link = "https://twitter.com/brighton_witness/status/1908234567890123456"
+    b_dome_x.publish_date = _dt(2026, 4, 5, 14, 38)
+    b_dome_x.documentation_date = _dt(2026, 4, 5, 17, 0)
+    b_dome_x.reliability_score = 60
+    b_dome_x.comments = (
+        "Account set to protected shortly after — screenshot and metadata preserved. "
+        "Dylan Kearney identifiable at the front of the group."
+    )
+    b_dome_x.status = status_assigned
+    b_dome_x.user_id = admin.id
+    b_dome_x.assigned_to_id = test_users["user3"].id
+    b_dome_x.tags = []
+    db.session.add(b_dome_x)
+    db.session.flush()
+    b_dome_x.labels.append(label_map["Brighton Dome Rally"])
+    b_dome_x.locations.append(brighton_dome)
+    b_dome_x.sources.append(sources["X (Twitter)"])
+
+    # Bulletin 3: Sussex Police statement
+    b_dome_sp = Bulletin()
+    b_dome_sp.title = "Sussex Police: one arrested following Brighton Dome disturbance — 5 April 2026"
+    b_dome_sp.sjac_title = "Sussex Police press statement: Brighton Dome arrest — 5 Apr 2026"
+    b_dome_sp.description = (
+        "Press statement published by Sussex Police at 18:00 GMT on 5 April 2026. "
+        "\n\n"
+        "\"Officers attended Brighton Dome, Church Street, Brighton at approximately "
+        "14:30 following reports of a group blocking the public entrance. A Section 35 "
+        "dispersal direction was issued under the Anti-social Behaviour, Crime and "
+        "Policing Act 2014. One man, aged 28, was arrested on suspicion of obstruction "
+        "of a public entrance. He has been released on bail pending further enquiries. "
+        "The remainder of the group dispersed without further incident by 15:10. "
+        "Sussex Police would like to thank members of the public for their patience.\""
+    )
+    b_dome_sp.originid = "sussex-police-dome-arrest-05apr2026"
+    b_dome_sp.source_link = "https://www.sussex.police.uk/news/brighton-dome-disturbance-05apr2026"
+    b_dome_sp.publish_date = _dt(2026, 4, 5, 18, 0)
+    b_dome_sp.documentation_date = _dt(2026, 4, 6, 9, 30)
+    b_dome_sp.reliability_score = 90
+    b_dome_sp.comments = (
+        "Official police statement — high reliability. Confirms arrest, Section 35, "
+        "and dispersal timeline. Does not name Kearney but The Argus article does."
+    )
+    b_dome_sp.status = status_assigned
+    b_dome_sp.user_id = admin.id
+    b_dome_sp.assigned_to_id = test_users["user1"].id
+    b_dome_sp.tags = []
+    db.session.add(b_dome_sp)
+    db.session.flush()
+    b_dome_sp.labels.append(label_map["Brighton Dome Rally"])
+    b_dome_sp.locations.append(brighton_dome)
+    b_dome_sp.sources.append(sources["Sussex Police"])
+
+    # ── Incident ───────────────────────────────────────────────────
+    inc_dome = Incident()
+    inc_dome.title = "Counter-protest and arrest at Brighton Dome — 5 April 2026"
+    inc_dome.description = (
+        "Approximately 50 counter-protesters affiliated with Brighton Climate "
+        "Justice Network blocked the Church Street entrance to Brighton Dome "
+        "during a Sussex Green Alliance climate rally. Police issued a Section 35 "
+        "dispersal order. One arrest: Dylan Kearney, for obstruction."
+    )
+    inc_dome.status = status_assigned
+    inc_dome.assigned_to_id = test_users["user2"].id
+    inc_dome.comments = "Linked to broader Sussex Green Alliance activity. Monitor for charge/bail outcome."
+    db.session.add(inc_dome)
+    db.session.flush()
+    inc_dome.labels.append(label_map["Brighton Dome Rally"])
+
+    # Actor-to-bulletin links
+    atob_dk1 = Atob(actor_id=a_dk.id, bulletin_id=b_dome_x.id)
+    atob_dk1.related_as = [4]  # Appeared
+    atob_dk1.probability = 2   # Certain
+    atob_dk1.comment = "Kearney identifiable at the front of the group in the X post image."
+    atob_dk1.user_id = admin.id
+    db.session.add(atob_dk1)
+
+    atob_dk2 = Atob(actor_id=a_dk.id, bulletin_id=b_argus.id)
+    atob_dk2.related_as = [4]  # Appeared
+    atob_dk2.probability = 2   # Certain
+    atob_dk2.comment = "Named directly in The Argus article as the arrested individual."
+    atob_dk2.user_id = admin.id
+    db.session.add(atob_dk2)
+    db.session.flush()
+
+    # Incident-to-bulletin links
+    for new_b, rel_type, prob, comment in [
+        (b_dome_x,  2, 2, "X post is primary visual evidence of the blockade."),
+        (b_argus,   2, 2, "Argus article names the arrested individual and confirms timeline."),
+        (b_dome_sp, 3, 2, "Sussex Police statement confirms arrest and Section 35 dispersal."),
+    ]:
+        db.session.add(Itob(
+            incident_id=inc_dome.id,
+            bulletin_id=new_b.id,
+            related_as=rel_type,
+            probability=prob,
+            comment=comment,
+            user_id=admin.id,
+        ))
+
+    # Incident-to-actor link
+    itoa_dk = Itoa(actor_id=a_dk.id, incident_id=inc_dome.id)
+    itoa_dk.related_as = [5]  # Participant
+    itoa_dk.probability = 2   # Certain
+    itoa_dk.comment = "Kearney arrested at the scene — confirmed participant."
+    itoa_dk.user_id = admin.id
+    db.session.add(itoa_dk)
+    db.session.flush()
+
     # ── Apply OVRM ID values to all bulletins ────────────────────────
     ovrm_ids = {
         b_pre:       "OVRM/2026/B/001",
@@ -2243,6 +2328,9 @@ def seed_minimal():
         b_tesco_bbc: "OVRM/2026/B/012",
         b_lw1:       "OVRM/2026/B/013",
         b_lw2:       "OVRM/2026/B/014",
+        b_argus:     "OVRM/2026/B/015",
+        b_dome_x:    "OVRM/2026/B/016",
+        b_dome_sp:   "OVRM/2026/B/017",
     }
     for bulletin, ovrm_id_val in ovrm_ids.items():
         DynamicField.apply_values(bulletin, {"ovrm_id": ovrm_id_val})
@@ -2252,9 +2340,10 @@ def seed_minimal():
     print("Minimal demo data seeded successfully!")
     print(f"  Test users: user1/user1pass (Analyst One), user2/user2pass (Analyst Two), user3/user3pass (Analyst Three)")
     print(f"  Sources:    {len(source_titles)} ({', '.join(source_titles)})")
-    print(f"  Locations:  4 (East Sussex → Lewes → Lewes Castle, Meridian House)")
-    print(f"  Actors:     3 (Thomas Ashdown | Rachel Pemberton | Kieran Moss)")
-    print(f"  Bulletins:  14 (OVRM/2026/B/001–014, OVRM ID field set)")
+    print(f"  Locations:  5 (East Sussex → Lewes → Lewes Castle, Meridian House | Brighton → Brighton Dome)")
+    print(f"  Actors:     4 (Thomas Ashdown | Rachel Pemberton | Kieran Moss | Dylan Kearney)")
+    print(f"  Bulletins:  17 (OVRM/2026/B/001–017, OVRM ID field set)")
+    print(f"    [Lewes Castle Siege]")
     print(f"    - Lewes Clarion: council approves Meridian House demolition — 3 Mar (assigned user1, context)")
     print(f"    - X post (assigned user1)")
     print(f"    - Facebook caption (assigned user2)")
@@ -2269,7 +2358,11 @@ def seed_minimal():
     print(f"    - Albion Broadcasting: Tesco protest mention (assigned user3)")
     print(f"    - Lewes & Weald Constabulary: criminal damage at Meridian House (assigned user3)")
     print(f"    - Lewes Clarion: criminal damage at Meridian House (assigned user1)")
-    print(f"  Incidents:  3 (Lewes Castle occupation | Phoenix Causeway assembly | Meridian House criminal damage)")
+    print(f"    [Brighton Dome Rally]")
+    print(f"    - The Argus: counter-protest at Brighton Dome (assigned user2)")
+    print(f"    - X post: crowd outside Brighton Dome (assigned user3)")
+    print(f"    - Sussex Police statement: one arrest (assigned user1)")
+    print(f"  Incidents:  4 (Lewes Castle occupation | Phoenix Causeway assembly | Meridian House criminal damage | Brighton Dome counter-protest)")
     print(f"  Media:      1 (castle photo)")
     return True
 

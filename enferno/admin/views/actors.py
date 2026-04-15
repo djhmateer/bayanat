@@ -81,6 +81,7 @@ def api_actors(validated_data: dict) -> Response:
         selectinload(Actor.assigned_to),
         selectinload(Actor.first_peer_reviewer),
         selectinload(Actor.roles),
+        selectinload(Actor.actor_profiles).selectinload(ActorProfile.labels),
     )
 
     if include_count and cursor is None:
@@ -174,6 +175,7 @@ def api_actors(validated_data: dict) -> Response:
                     ),
                     "_status": item.status,
                     "review_action": item.review_action,
+                    "labels": list({l.id: {"id": l.id, "title": l.title} for p in item.actor_profiles for l in p.labels}.values()),
                 }
             )
         else:

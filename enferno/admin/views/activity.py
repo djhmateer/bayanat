@@ -181,10 +181,11 @@ def api_query_create() -> Response:
         query.data = q
         query.query_type = query_type
         query.user_id = current_user.id
-        query.save()
-        return HTTPResponse.created(
-            message="Query successfully saved", data={"item": query.to_dict()}
-        )
+        if query.save():
+            return HTTPResponse.created(
+                message="Query successfully saved", data={"item": query.to_dict()}
+            )
+        return HTTPResponse.error("Failed to save query (name may already exist). Try appending Bulletins, Actors or Incidents.", status=409)
     else:
         return HTTPResponse.error("Error parsing query data", status=400)
 

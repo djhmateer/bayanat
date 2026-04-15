@@ -185,6 +185,16 @@
                         
                         <template v-if="fetchingRecordsError" v-slot:no-data></template>
 
+                        <template #item.labels="{item}">
+                            <v-chip
+                                v-for="label in item.labels"
+                                :key="label.id"
+                                size="x-small"
+                                class="mr-1"
+                                variant="tonal"
+                            >${label.title}</v-chip>
+                        </template>
+
                         <template v-slot:item.roles="{item}">
                             <v-tooltip location="top" :text="role.name" v-for="role in item.roles">
                                 <template v-slot:activator="{props}">
@@ -540,6 +550,7 @@
                 headers: [
                     {title: "{{_('ID')}}", value: "id", width: 12, sortable: false},
                     {title: "{{_('Title')}}", value: "title", width: 300, sortable: false},
+                    {title: "{{_('Labels')}}", value: "labels", width: 200, sortable: false},
                     {% if (current_user.has_role('Admin') or current_user.has_role('DA')) %}
                         {title: "{{_('Assigned To')}}", value: "assigned_to.name", width: 130, sortable: false},
                         {title: "{{_('Access Groups')}}", value: "roles", width: 130, sortable: false},

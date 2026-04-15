@@ -89,6 +89,7 @@ def api_incidents(validated_data: dict) -> Response:
         selectinload(Incident.assigned_to),
         selectinload(Incident.first_peer_reviewer),
         selectinload(Incident.roles),
+        selectinload(Incident.labels),
     )
 
     if include_count and cursor is None:
@@ -182,6 +183,7 @@ def api_incidents(validated_data: dict) -> Response:
                     ),
                     "_status": item.status,
                     "review_action": item.review_action,
+                    "labels": [{"id": l.id, "title": l.title} for l in item.labels],
                 }
             )
         else:
