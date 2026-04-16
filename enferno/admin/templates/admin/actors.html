@@ -232,6 +232,18 @@
                             </v-tooltip>
                         </template>
 
+                        <template #item.first_media="{item}">
+                            <div v-if="item.first_media" style="width: 120px; height: 120px; padding: 2px; display: flex; align-items: center; justify-content: center; overflow: hidden; border-radius: 4px;">
+                                <img v-if="item.first_media.type?.startsWith('image')"
+                                    :src="item.first_media.media_url"
+                                    :alt="'Media for actor ' + item.id"
+                                    style="max-width: 100%; max-height: 100%; object-fit: cover; border-radius: 4px;"
+                                />
+                                <v-icon v-else-if="item.first_media.type?.startsWith('video')" size="40" color="primary">mdi-play-circle</v-icon>
+                                <v-icon v-else size="40" color="primary">mdi-file</v-icon>
+                            </div>
+                        </template>
+
                         <template #item.labels="{item}">
                             <v-chip
                                 v-for="label in item.labels"
@@ -242,6 +254,7 @@
                             >${label.title}</v-chip>
                         </template>
 
+                        <!-- Access Groups column - commented out
                         <template v-slot:item.roles="{item}">
                             <v-tooltip location="top" :text="role.name" v-for="role in item.roles">
                                 <template v-slot:activator="{props}">
@@ -255,6 +268,7 @@
                                 </template>
                             </v-tooltip>
                         </template>
+                        -->
 
 
                         <template v-slot:item.status="{ item }">
@@ -621,10 +635,11 @@
                     {title: "{{_('ID')}}", value: "id", width: 12, sortable: false},
                     {title: "{{_('Type')}}", value: "type", width: 20, sortable: false},
                     {title: "{{_('Name')}}", value: "name", width: 300, sortable: false},
+                    {title: "{{_('Media')}}", value: "first_media", width: 160, sortable: false},
                     {title: "{{_('Labels')}}", value: "labels", width: 200, sortable: false},
                     {% if (current_user.has_role('Admin') or current_user.has_role('DA')) %}
                         {title: "{{_('Assigned To')}}", value: "assigned_to.name", width: 130, sortable: false},
-                        {title: "{{_('Access Groups')}}", value: "roles", width: 130, sortable: false},
+                        // {title: "{{_('Access Groups')}}", value: "roles", width: 130, sortable: false},
                     {% endif %}
                     {title: "{{_('Status')}}", value: "_status", width: 150, sortable: false},
                     {title: "{{_('Actions')}}", value: "action", sortable: false, width: 100}

@@ -170,7 +170,7 @@
                         <div v-if="fixedDynamicFields({ entityType: 'incident' }).length" class="form-grid mt-4">
                             <template v-for="(field, index) in fixedDynamicFields({ entityType: 'incident' })" :key="field.id">
                                 <div v-if="isFieldActive(field, 'comments')" :class="fieldClass(field)">
-                                    <v-textarea required class="h-100" :rules="[validationRules.required()]" outlined v-model="editedItem.comments"
+                                    <v-textarea class="h-100" outlined v-model="editedItem.comments"
                                         label="{{ _('Comments') }}" v-bind="serverErrorPropsForField(serverErrors, 'item.comments')">
                                     </v-textarea>
                                 </div>

@@ -213,6 +213,40 @@
                             >${label.title}</v-chip>
                         </template>
 
+                        <template #item.sources="{item}">
+                            <v-chip
+                                v-for="source in item.sources"
+                                :key="source.id"
+                                size="x-small"
+                                class="mr-1"
+                                variant="tonal"
+                            >${source.title}</v-chip>
+                        </template>
+
+                        <template #item.first_media="{item}">
+                            <div v-if="item.first_media" style="width: 120px; height: 120px; padding: 2px; display: flex; align-items: center; justify-content: center; overflow: hidden; border-radius: 4px;">
+                                <img v-if="item.first_media.type?.startsWith('image')"
+                                    :src="item.first_media.media_url"
+                                    :alt="'Media for bulletin ' + item.id"
+                                    style="max-width: 100%; max-height: 100%; object-fit: cover; border-radius: 4px;"
+                                />
+                                <v-icon v-else-if="item.first_media.type?.startsWith('video')" size="40" color="primary">mdi-play-circle</v-icon>
+                                <v-icon v-else size="40" color="primary">mdi-file</v-icon>
+                            </div>
+                        </template>
+
+                        <template #item.first_event="{item}">
+                            <div v-if="item.events && item.events.length > 0">
+                                <v-chip size="small" variant="outlined">
+                                    ${ item.events[0].eventtype || 'Unknown' }
+                                </v-chip>
+                            </div>
+                            <div v-else style="color: #999; font-style: italic;">
+                                {{ _('No events') }}
+                            </div>
+                        </template>
+
+                        <!-- TODO: Access Groups column - commented out but can be easily restored
                         <template #item.roles="{item}">
                             <v-tooltip location="top" :text="role.name" v-for="role in item.roles">
 
@@ -228,6 +262,7 @@
                             </v-tooltip>
 
                         </template>
+                        -->
 
                         <template #item.status="{ item }">
                             ${item.status}
@@ -664,11 +699,13 @@
                     headers: [
                         {title: "{{_('ID')}}", value: "id", width: 12, sortable: true},
                         {title: "{{_('Title')}}", value: "title", width: 300, sortable: false},
-                        {title: "{{_('Labels')}}", value: "labels", width: 200, sortable: false},
+                        {title: "{{_('Media')}}", value: "first_media", width: 160, sortable: false},
+                        {title: "{{_('Event Type')}}", value: "first_event", width: 150, sortable: false},
+                        {title: "{{_('Sources')}}", value: "sources", width: 200, sortable: false},
+                        {title: "{{_('Investigation')}}", value: "labels", width: 200, sortable: false},
 
                         {% if (current_user.has_role('Admin') or current_user.has_role('DA')) %}
                             {title: "{{_('Assigned To')}}", value: "assigned_to.name", width: 130, sortable: false},
-                            {title: "{{_('Access Groups')}}", value: "roles", width: 130, sortable: false},
                         {% endif %}
                         {title: "{{_('Status')}}", value: "_status", width: 150, sortable: false},
 

@@ -210,19 +210,6 @@ def replace_reference_data():
     _replace(Eventtype, [
         {"id": 10, "title": "Birth", "for_actor": True, "for_bulletin": False},
         {"id": 11, "title": "Death", "for_actor": True, "for_bulletin": False},
-        {"id": 12, "title": "Arrested", "for_actor": True, "for_bulletin": False},
-        {"id": 13, "title": "Released", "for_actor": True, "for_bulletin": False},
-        {"id": 14, "title": "Charged", "for_actor": True, "for_bulletin": False},
-        {"id": 15, "title": "Convicted", "for_actor": True, "for_bulletin": False},
-        {"id": 16, "title": "Sentenced", "for_actor": True, "for_bulletin": False},
-        {"id": 17, "title": "Acquitted", "for_actor": True, "for_bulletin": False},
-        {"id": 18, "title": "Pardoned", "for_actor": True, "for_bulletin": False},
-        {"id": 19, "title": "Wounded", "for_actor": True, "for_bulletin": False},
-        {"id": 20, "title": "Testified", "for_actor": True, "for_bulletin": False},
-        {"id": 21, "title": "Plea Deal", "for_actor": True, "for_bulletin": False},
-        {"id": 22, "title": "Trial", "for_actor": True, "for_bulletin": False},
-        {"id": 23, "title": "Sighting", "for_actor": True, "for_bulletin": False},
-        {"id": 24, "title": "Other", "for_actor": True, "for_bulletin": False},
         {"id": 29, "title": "Pre-Incident", "for_actor": False, "for_bulletin": True},
         {"id": 30, "title": "Incident", "for_actor": False, "for_bulletin": True},
         {"id": 31, "title": "Post-Incident", "for_actor": False, "for_bulletin": True},
@@ -352,6 +339,22 @@ def replace_reference_data():
         {"id": 2, "title": "Part of"},
         {"id": 3, "title": "Led to"},
         {"id": 4, "title": "Related"},
+    ])
+
+    # ── Workflow Statuses (Bulletin.status, Actor.status, Incident.status use string values)
+    _replace(WorkflowStatus, [
+        {"id": 1, "title": "Machine Created", "title_tr": "Machine Created"},
+        {"id": 2, "title": "Human Created", "title_tr": "Human Created"},
+        {"id": 3, "title": "Updated", "title_tr": "Updated"},
+        {"id": 4, "title": "Peer Reviewed", "title_tr": "Peer Reviewed"},
+        {"id": 5, "title": "Finalized", "title_tr": "Finalized"},
+        {"id": 6, "title": "Senior Reviewed", "title_tr": "Senior Reviewed"},
+        {"id": 7, "title": "Machine Updated", "title_tr": "Machine Updated"},
+        {"id": 8, "title": "Assigned", "title_tr": "Assigned"},
+        {"id": 9, "title": "Second Peer Review", "title_tr": "Second Peer Review"},
+        {"id": 10, "title": "Revisited", "title_tr": "Revisited"},
+        {"id": 11, "title": "Senior Updated", "title_tr": "Senior Updated"},
+        {"id": 12, "title": "Peer Review Assigned", "title_tr": "Peer Review Assigned"},
     ])
 
     _replace(IDNumberType, [
@@ -486,10 +489,9 @@ def seed_minimal():
     loc_type_admin = LocationType.query.filter_by(title="Administrative Location").first()
     loc_type_poi = LocationType.query.filter_by(title="Point of Interest").first()
     admin_level = {al.title: al for al in LocationAdminLevel.query.all()}
-    wf_reviewed = WorkflowStatus.query.filter_by(title="Peer Reviewed").first()
-    wf_assigned = WorkflowStatus.query.filter_by(title="Assigned").first()
-    status = wf_reviewed.title if wf_reviewed else "Peer Reviewed"
-    status_assigned = wf_assigned.title if wf_assigned else "Assigned"
+    wf_human_created = WorkflowStatus.query.filter_by(title="Human Created").first()
+    status = wf_human_created.title if wf_human_created else "Human Created"
+    status_assigned = status  # All sample data uses Human Created status (manually uploaded)
     evt_types = {et.title: et for et in Eventtype.query.all()}
     pv = {v.title: v for v in PotentialViolation.query.all()}
     cv = {v.title: v for v in ClaimedViolation.query.all()}
@@ -510,7 +512,7 @@ def seed_minimal():
         "YouTube",
         "Witness Statement",
         "TikTok",
-        "Lewes Clarion",
+        "Lewes Clarion Newspaper",
         "The Argus",
         "Sussex Police",
     ]
@@ -733,7 +735,7 @@ def seed_minimal():
         "trespass. His legal representative declined to comment."
     )
     a.status = status
-    a.assigned_to_id = test_users["user2"].id
+    a.assigned_to_id = test_users["user2"].id  # Actor ID 1: assigned
     a.first_peer_reviewer_id = test_users["user3"].id
     a.second_peer_reviewer_id = test_users["user1"].id
     a.tags = []
@@ -822,7 +824,7 @@ def seed_minimal():
         "campaigner. Released on bail. No charges confirmed at time of writing."
     )
     a2.status = status
-    a2.assigned_to_id = test_users["user1"].id
+    a2.assigned_to_id = test_users["user1"].id  # Actor ID 2: assigned
     a2.first_peer_reviewer_id = test_users["user2"].id
     a2.second_peer_reviewer_id = test_users["user3"].id
     a2.tags = []
@@ -900,7 +902,7 @@ def seed_minimal():
         "linking him to the criminal damage. Documentation ongoing."
     )
     a3.status = status_assigned
-    a3.assigned_to_id = test_users["user2"].id
+    a3.assigned_to_id = test_users["user2"].id  # Actor ID 3: assigned
     a3.first_peer_reviewer_id = test_users["user1"].id
     a3.tags = []
     a3.id_number = []
@@ -938,14 +940,14 @@ def seed_minimal():
     et_post = evt_types.get("Post-Incident")
     et_pub = evt_types.get("Publication")
 
-    # ── Pre-incident: Lewes Clarion article ────────────────────────
+    # ── Pre-incident: Lewes Clarion Newspaper article ────────────────────────
     b_pre = Bulletin()
     b_pre.title = (
         "Anger in Lewes as council approves demolition of Meridian House"
     )
-    b_pre.sjac_title = "Lewes Clarion: council approves demolition of Meridian House — 3 Mar 2026"
+    b_pre.sjac_title = "Lewes Clarion Newspaper: council approves demolition of Meridian House — 3 Mar 2026"
     b_pre.description = (
-        "Lewes Clarion article published online at 09:15 GMT on 3 March 2026. "
+        "Lewes Clarion Newspaper article published online at 09:15 GMT on 3 March 2026. "
         "Reports that Lewes District Council voted 7–4 to approve a planning "
         "application for the demolition of Meridian House, a Grade II listed "
         "Victorian building adjacent to Lewes Castle, to make way for a mixed-use "
@@ -975,14 +977,14 @@ def seed_minimal():
     )
     b_pre.status = status_assigned
     b_pre.user_id = admin.id
-    b_pre.assigned_to_id = test_users["user1"].id
+    b_pre.assigned_to_id = test_users["user1"].id  # Bulletin ID 1: assigned
     b_pre.tags = []
     db.session.add(b_pre)
     db.session.flush()
 
     b_pre.labels.append(label_map["Lewes Castle Siege"])
     b_pre.locations.append(lewes)
-    b_pre.sources.append(sources["Lewes Clarion"])
+    b_pre.sources.append(sources["Lewes Clarion Newspaper"])
 
     geo_type_comm = GeoLocationType.query.filter_by(title="Commercial/Retail").first()
     geo_meridian = GeoLocation()
@@ -1032,7 +1034,7 @@ def seed_minimal():
     )
     b.status = status_assigned
     b.user_id = admin.id
-    b.assigned_to_id = user1.id
+    b.assigned_to_id = user1.id  # Bulletin ID 2: assigned
     b.tags = []
     db.session.add(b)
     db.session.flush()
@@ -1108,7 +1110,7 @@ def seed_minimal():
     )
     b_fb.status = status_assigned
     b_fb.user_id = admin.id
-    b_fb.assigned_to_id = test_users["user2"].id
+    b_fb.assigned_to_id = test_users["user2"].id  # Bulletin ID 3: assigned
     b_fb.tags = []
     db.session.add(b_fb)
     db.session.flush()
@@ -1161,7 +1163,7 @@ def seed_minimal():
     )
     b_ig.status = status_assigned
     b_ig.user_id = admin.id
-    b_ig.assigned_to_id = test_users["user3"].id
+    b_ig.assigned_to_id = test_users["user3"].id  # Bulletin ID 4: assigned
     b_ig.tags = []
     db.session.add(b_ig)
     db.session.flush()
@@ -1199,7 +1201,7 @@ def seed_minimal():
     )
     b_tt.status = status_assigned
     b_tt.user_id = admin.id
-    b_tt.assigned_to_id = test_users["user1"].id
+    b_tt.assigned_to_id = test_users["user1"].id  # Bulletin ID 5: assigned
     b_tt.tags = []
     db.session.add(b_tt)
     db.session.flush()
@@ -1254,7 +1256,7 @@ def seed_minimal():
     )
     b_ew.status = status_assigned
     b_ew.user_id = admin.id
-    b_ew.assigned_to_id = test_users["user2"].id
+    # b_ew.assigned_to_id not set (bulletin ID 6: unassigned)
     b_ew.tags = []
     db.session.add(b_ew)
     db.session.flush()
@@ -1306,7 +1308,7 @@ def seed_minimal():
     )
     b_bbc.status = status_assigned
     b_bbc.user_id = admin.id
-    b_bbc.assigned_to_id = test_users["user3"].id
+    # b_bbc.assigned_to_id not set (bulletin ID 7: unassigned)
     b_bbc.tags = []
     db.session.add(b_bbc)
     db.session.flush()
@@ -1348,7 +1350,7 @@ def seed_minimal():
     )
     b_sp.status = status_assigned
     b_sp.user_id = admin.id
-    b_sp.assigned_to_id = test_users["user1"].id
+    # b_sp.assigned_to_id not set (bulletin ID 8: unassigned)
     b_sp.tags = []
     db.session.add(b_sp)
     db.session.flush()
@@ -1388,7 +1390,7 @@ def seed_minimal():
     )
     b_grdn.status = status_assigned
     b_grdn.user_id = admin.id
-    b_grdn.assigned_to_id = test_users["user2"].id
+    # b_grdn.assigned_to_id not set (bulletin ID 9: unassigned)
     b_grdn.tags = []
     db.session.add(b_grdn)
     db.session.flush()
@@ -1429,7 +1431,7 @@ def seed_minimal():
     )
     b_sp2.status = status_assigned
     b_sp2.user_id = admin.id
-    b_sp2.assigned_to_id = test_users["user3"].id
+    # b_sp2.assigned_to_id not set (bulletin ID 10: unassigned)
     b_sp2.tags = []
     db.session.add(b_sp2)
     db.session.flush()
@@ -1505,7 +1507,7 @@ def seed_minimal():
         "Seven arrests were made over the course of the three-day occupation."
     )
     inc.status = status
-    inc.assigned_to_id = test_users["user2"].id
+    inc.assigned_to_id = test_users["user2"].id  # Incident ID 1: assigned
     inc.first_peer_reviewer_id = test_users["user3"].id
     inc.second_peer_reviewer_id = test_users["user1"].id
     inc.comments = (
@@ -1673,7 +1675,7 @@ def seed_minimal():
         "without arrest by approximately 16:30 GMT."
     )
     inc2.status = status_assigned
-    inc2.assigned_to_id = test_users["user1"].id
+    inc2.assigned_to_id = test_users["user1"].id  # Incident ID 2: assigned
     inc2.first_peer_reviewer_id = test_users["user2"].id
     inc2.comments = (
         "Confirmed via X post and Albion Broadcasting coverage. No arrests made. "
@@ -1730,7 +1732,7 @@ def seed_minimal():
     )
     b_tesco_x.status = status_assigned
     b_tesco_x.user_id = admin.id
-    b_tesco_x.assigned_to_id = test_users["user2"].id
+    # b_tesco_x.assigned_to_id not set (unassigned)
     b_tesco_x.tags = []
     db.session.add(b_tesco_x)
     db.session.flush()
@@ -1776,7 +1778,7 @@ def seed_minimal():
     )
     b_tesco_bbc.status = status_assigned
     b_tesco_bbc.user_id = admin.id
-    b_tesco_bbc.assigned_to_id = test_users["user3"].id
+    # b_tesco_bbc.assigned_to_id not set (unassigned)
     b_tesco_bbc.tags = []
     db.session.add(b_tesco_bbc)
     db.session.flush()
@@ -1886,7 +1888,7 @@ def seed_minimal():
     )
     b_lw1.status = status_assigned
     b_lw1.user_id = admin.id
-    b_lw1.assigned_to_id = test_users["user3"].id
+    # b_lw1.assigned_to_id not set (unassigned)
     b_lw1.tags = []
     db.session.add(b_lw1)
     db.session.flush()
@@ -1919,16 +1921,16 @@ def seed_minimal():
 
     b_lw2 = Bulletin()
     b_lw2.title = "Demolition site targeted by vandals days after Lewes Castle siege"
-    b_lw2.sjac_title = "Lewes Clarion: criminal damage at Meridian House site — 22 Mar 2026"
+    b_lw2.sjac_title = "Lewes Clarion Newspaper: criminal damage at Meridian House site — 22 Mar 2026"
     b_lw2.description = (
-        "Lewes Clarion online article published at 13:45 GMT on 22 March 2026. "
+        "Lewes Clarion Newspaper online article published at 13:45 GMT on 22 March 2026. "
         "Reports that the Meridian House demolition site on the Harvey's Brewery "
         "site was targeted by vandals in the early hours of 22 March. The article "
         "describes slashed tyres on two excavators and slogans including 'Heritage "
         "Not Rubble' and 'Meridian Lives' spray-painted on site hoarding. The "
         "article quotes the lead contractor, Apex Build Group, confirming the "
         "damage and estimating repair and replacement costs of approximately £18,000. "
-        "The Lewes Clarion notes the damage occurred three days after seven people "
+        "The Lewes Clarion Newspaper notes the damage occurred three days after seven people "
         "were arrested in connection with the castle occupation and draws an "
         "editorial connection to the Lewes Heritage Trust campaign, though no "
         "group has claimed responsibility. Lewes & Weald Constabulary declined "
@@ -1947,14 +1949,14 @@ def seed_minimal():
     )
     b_lw2.status = status_assigned
     b_lw2.user_id = admin.id
-    b_lw2.assigned_to_id = test_users["user1"].id
+    # b_lw2.assigned_to_id not set (unassigned)
     b_lw2.tags = []
     db.session.add(b_lw2)
     db.session.flush()
 
     b_lw2.labels.append(label_map["Lewes Castle Siege"])
     b_lw2.locations.append(lewes)
-    b_lw2.sources.append(sources["Lewes Clarion"])
+    b_lw2.sources.append(sources["Lewes Clarion Newspaper"])
 
     geo_meridian3 = GeoLocation()
     geo_meridian3.title = "Meridian House demolition site"
@@ -1984,7 +1986,7 @@ def seed_minimal():
         "arrested in connection with the Lewes Castle occupation."
     )
     inc3.status = status_assigned
-    inc3.assigned_to_id = test_users["user1"].id
+    inc3.assigned_to_id = test_users["user1"].id  # Incident ID 3: assigned
     inc3.first_peer_reviewer_id = test_users["user3"].id
     inc3.second_peer_reviewer_id = test_users["user2"].id
     inc3.comments = (
@@ -2016,7 +2018,7 @@ def seed_minimal():
         bulletin_id=b_lw2.id,
         related_as=3,  # Supporting Evidence
         probability=1,  # Likely
-        comment="Lewes Clarion corroborates the police account and adds contractor cost estimate and slogan detail.",
+        comment="Lewes Clarion Newspaper corroborates the police account and adds contractor cost estimate and slogan detail.",
         user_id=admin.id,
     ))
     db.session.flush()
@@ -2062,14 +2064,42 @@ def seed_minimal():
 
     db.session.flush()
 
-    # ── Media (Lewes Castle photo — stand-in for X post image) ─────
+    # ── Media setup ─────
     from enferno.utils.data_helpers import get_file_hash
+    import shutil
 
     media_dir = Media.media_dir
     media_dir.mkdir(parents=True, exist_ok=True)
 
-    import shutil
+    # Media for Meridian House bulletin
+    src_file = Path(__file__).parent / "meridian-house.png"
+    filename = "meridian-house.png"
+    filepath = media_dir / filename
 
+    if not filepath.exists() and src_file.exists():
+        shutil.copy2(src_file, filepath)
+        print(f"  Copied {filename} to media directory")
+
+    if filepath.exists():
+        etag = get_file_hash(str(filepath))
+        if not Media.query.filter(Media.etag == etag, Media.deleted.is_not(True)).first():
+            media = Media()
+            media.media_file = filename
+            media.media_file_type = "image/png"
+            media.title = "Meridian House demolition illustration"
+            media.comments = "Artist's rendering of Meridian House (Grade II listed building) at Harvey's Brewery Site, Lewes"
+            media.etag = etag
+            cat_photo = MediaCategory.query.filter_by(title="Photo").first()
+            if cat_photo:
+                media.category_id = cat_photo.id
+            media.main = True
+            media.user_id = admin.id
+            media.bulletin_id = b_pre.id
+            db.session.add(media)
+    elif not src_file.exists():
+        print(f"  Warning: {src_file} not found — no media attached to Meridian House bulletin")
+
+    # ── Media (Lewes Castle photo — stand-in for X post image) ─────
     src_file = Path(__file__).parent / "lewes-castle.png"
     filename = "lewes-castle.png"
     filepath = media_dir / filename
@@ -2097,6 +2127,258 @@ def seed_minimal():
     elif not src_file.exists():
         print(f"  Warning: {src_file} not found — no media attached")
 
+    # ── Media (Lewes Castle photo — Facebook post) ──────────────────────
+    src_file = Path(__file__).parent / "3-lewes-castle.png"
+    filename = "3-lewes-castle.png"
+    filepath = media_dir / filename
+
+    if not filepath.exists() and src_file.exists():
+        shutil.copy2(src_file, filepath)
+        print(f"  Copied {filename} to media directory")
+
+    if filepath.exists():
+        etag = get_file_hash(str(filepath))
+        if not Media.query.filter(Media.etag == etag, Media.deleted.is_not(True)).first():
+            media = Media()
+            media.media_file = filename
+            media.media_file_type = "image/png"
+            media.title = "Crowd outside Lewes Castle — posted to Facebook by Sandra Brightwell"
+            media.comments = "Facebook photograph taken from car window, 17 March 2026 14:35 GMT"
+            media.etag = etag
+            cat_photo = MediaCategory.query.filter_by(title="Photo").first()
+            if cat_photo:
+                media.category_id = cat_photo.id
+            media.main = True
+            media.user_id = admin.id
+            media.bulletin_id = b_fb.id
+            db.session.add(media)
+    elif not src_file.exists():
+        print(f"  Warning: {src_file} not found — no media attached to Facebook bulletin")
+
+    # ── Media (Lewes Castle photo — Instagram post) ──────────────────────
+    src_file = Path(__file__).parent / "4-history-under-siege.png"
+    filename = "4-history-under-siege.png"
+    filepath = media_dir / filename
+
+    if not filepath.exists() and src_file.exists():
+        shutil.copy2(src_file, filepath)
+        print(f"  Copied {filename} to media directory")
+
+    if filepath.exists():
+        etag = get_file_hash(str(filepath))
+        if not Media.query.filter(Media.etag == etag, Media.deleted.is_not(True)).first():
+            media = Media()
+            media.media_file = filename
+            media.media_file_type = "image/png"
+            media.title = "History under siege — Lewes Castle barbican — posted to Instagram by @historic_lewes"
+            media.comments = "Instagram photograph from elevated angle, 17 March 2026 14:41 GMT"
+            media.etag = etag
+            cat_photo = MediaCategory.query.filter_by(title="Photo").first()
+            if cat_photo:
+                media.category_id = cat_photo.id
+            media.main = True
+            media.user_id = admin.id
+            media.bulletin_id = b_ig.id
+            db.session.add(media)
+    elif not src_file.exists():
+        print(f"  Warning: {src_file} not found — no media attached to Instagram bulletin")
+
+    # ── Media (Lewes Castle video — TikTok post) ──────────────────────
+    src_file = Path(__file__).parent / "5-castle-video.mp4"
+    filename = "5-castle-video.mp4"
+    filepath = media_dir / filename
+
+    if not filepath.exists() and src_file.exists():
+        shutil.copy2(src_file, filepath)
+        print(f"  Copied {filename} to media directory")
+
+    if filepath.exists():
+        etag = get_file_hash(str(filepath))
+        if not Media.query.filter(Media.etag == etag, Media.deleted.is_not(True)).first():
+            media = Media()
+            media.media_file = filename
+            media.media_file_type = "video/mp4"
+            media.title = "Interior footage of crowd inside Lewes Castle grounds — posted to TikTok by @sussex_daily"
+            media.comments = "TikTok video from inside the castle, 17 March 2026 15:04 GMT. 47 seconds handheld video."
+            media.etag = etag
+            cat_video = MediaCategory.query.filter_by(title="Video").first()
+            if cat_video:
+                media.category_id = cat_video.id
+            media.main = True
+            media.user_id = admin.id
+            media.bulletin_id = b_tt.id
+            db.session.add(media)
+    elif not src_file.exists():
+        print(f"  Warning: {src_file} not found — no media attached to TikTok bulletin")
+
+    # ── Media (Tesco Lewes protest photo — X post) ───────────────────
+    src_file = Path(__file__).parent / "11-tesco.png"
+    filename = "11-tesco.png"
+    filepath = media_dir / filename
+
+    if not filepath.exists() and src_file.exists():
+        shutil.copy2(src_file, filepath)
+        print(f"  Copied {filename} to media directory")
+
+    if filepath.exists():
+        etag = get_file_hash(str(filepath))
+        if not Media.query.filter(Media.etag == etag, Media.deleted.is_not(True)).first():
+            media = Media()
+            media.media_file = filename
+            media.media_file_type = "image/png"
+            media.title = "Protest at Tesco Lewes car park — 18 March 2026"
+            media.comments = "X post photograph showing protesters with Lewes Heritage Trust placards at Tesco"
+            media.etag = etag
+            cat_photo = MediaCategory.query.filter_by(title="Photo").first()
+            if cat_photo:
+                media.category_id = cat_photo.id
+            media.main = True
+            media.user_id = admin.id
+            media.bulletin_id = b_tesco_x.id
+            db.session.add(media)
+    elif not src_file.exists():
+        print(f"  Warning: {src_file} not found — no media attached to Tesco bulletin")
+
+    # ── Media (Demolition site photograph) ────────────────────────────
+    src_file = Path(__file__).parent / "14-demolition.png"
+    filename = "14-demolition.png"
+    filepath = media_dir / filename
+
+    if not filepath.exists() and src_file.exists():
+        shutil.copy2(src_file, filepath)
+        print(f"  Copied {filename} to media directory")
+
+    if filepath.exists():
+        etag = get_file_hash(str(filepath))
+        if not Media.query.filter(Media.etag == etag, Media.deleted.is_not(True)).first():
+            media = Media()
+            media.media_file = filename
+            media.media_file_type = "image/png"
+            media.title = "Meridian House demolition site — criminal damage aftermath"
+            media.comments = "Photograph of demolition site showing damaged excavators and vandalism, 22 March 2026"
+            media.etag = etag
+            cat_photo = MediaCategory.query.filter_by(title="Photo").first()
+            if cat_photo:
+                media.category_id = cat_photo.id
+            media.main = True
+            media.user_id = admin.id
+            media.bulletin_id = b_lw2.id
+            db.session.add(media)
+    elif not src_file.exists():
+        print(f"  Warning: {src_file} not found — no media attached to Demolition bulletin")
+
+    # ── Media (Actor photograph — Thomas Ashdown) ─────────────────────
+    src_file = Path(__file__).parent / "actor1-thomas-ashdown.png"
+    filename = "actor1-thomas-ashdown.png"
+    filepath = media_dir / filename
+
+    if not filepath.exists() and src_file.exists():
+        shutil.copy2(src_file, filepath)
+        print(f"  Copied {filename} to media directory")
+
+    if filepath.exists():
+        etag = get_file_hash(str(filepath))
+        if not Media.query.filter(Media.etag == etag, Media.deleted.is_not(True)).first():
+            media = Media()
+            media.media_file = filename
+            media.media_file_type = "image/png"
+            media.title = "Thomas Ashdown — identified in crowd at Lewes Castle"
+            media.comments = "Screenshot from X post showing Thomas Ashdown at front of crowd, 17 March 2026"
+            media.etag = etag
+            cat_photo = MediaCategory.query.filter_by(title="Photo").first()
+            if cat_photo:
+                media.category_id = cat_photo.id
+            media.main = True
+            media.user_id = admin.id
+            media.actor_id = a.id
+            db.session.add(media)
+    elif not src_file.exists():
+        print(f"  Warning: {src_file} not found — no media attached to Thomas Ashdown")
+
+    # ── Media (Secondary image — Lake 1) ───────────────────────────────
+    src_file = Path(__file__).parent / "lake1.jpg"
+    filename = "lake1.jpg"
+    filepath = media_dir / filename
+
+    if not filepath.exists() and src_file.exists():
+        shutil.copy2(src_file, filepath)
+        print(f"  Copied {filename} to media directory")
+
+    if filepath.exists():
+        etag = get_file_hash(str(filepath))
+        if not Media.query.filter(Media.etag == etag, Media.deleted.is_not(True)).first():
+            media = Media()
+            media.media_file = filename
+            media.media_file_type = "image/jpeg"
+            media.title = "lake1.jpg"
+            media.comments = "Secondary image for Thomas Ashdown"
+            media.etag = etag
+            cat_photo = MediaCategory.query.filter_by(title="Photo").first()
+            if cat_photo:
+                media.category_id = cat_photo.id
+            media.main = False
+            media.user_id = admin.id
+            media.actor_id = a.id
+            db.session.add(media)
+    elif not src_file.exists():
+        print(f"  Warning: {src_file} not found — no media attached to Thomas Ashdown")
+
+    # ── Media (Actor photograph — Rachel Pemberton) ────────────────────
+    src_file = Path(__file__).parent / "actor2-rachel-pemberton.png"
+    filename = "actor2-rachel-pemberton.png"
+    filepath = media_dir / filename
+
+    if not filepath.exists() and src_file.exists():
+        shutil.copy2(src_file, filepath)
+        print(f"  Copied {filename} to media directory")
+
+    if filepath.exists():
+        etag = get_file_hash(str(filepath))
+        if not Media.query.filter(Media.etag == etag, Media.deleted.is_not(True)).first():
+            media = Media()
+            media.media_file = filename
+            media.media_file_type = "image/png"
+            media.title = "Rachel Pemberton — Chair of Lewes Heritage Trust"
+            media.comments = "Photograph of Rachel Pemberton, arrested during castle clearance, 19 March 2026"
+            media.etag = etag
+            cat_photo = MediaCategory.query.filter_by(title="Photo").first()
+            if cat_photo:
+                media.category_id = cat_photo.id
+            media.main = True
+            media.user_id = admin.id
+            media.actor_id = a2.id
+            db.session.add(media)
+    elif not src_file.exists():
+        print(f"  Warning: {src_file} not found — no media attached to Rachel Pemberton")
+
+    # ── Media (Actor photograph — Kieran Moss) ──────────────────────────
+    src_file = Path(__file__).parent / "actor3-kieran-moss.png"
+    filename = "actor3-kieran-moss.png"
+    filepath = media_dir / filename
+
+    if not filepath.exists() and src_file.exists():
+        shutil.copy2(src_file, filepath)
+        print(f"  Copied {filename} to media directory")
+
+    if filepath.exists():
+        etag = get_file_hash(str(filepath))
+        if not Media.query.filter(Media.etag == etag, Media.deleted.is_not(True)).first():
+            media = Media()
+            media.media_file = filename
+            media.media_file_type = "image/png"
+            media.title = "Kieran Moss — flagged as person of interest"
+            media.comments = "Photograph of Kieran Moss, flagged as person of interest in connection with Incident 3"
+            media.etag = etag
+            cat_photo = MediaCategory.query.filter_by(title="Photo").first()
+            if cat_photo:
+                media.category_id = cat_photo.id
+            media.main = True
+            media.user_id = admin.id
+            media.actor_id = a3.id
+            db.session.add(media)
+    elif not src_file.exists():
+        print(f"  Warning: {src_file} not found — no media attached to Kieran Moss")
+
     # ═══════════════════════════════════════════════════════════════════
     # BRIGHTON DOME RALLY — 5 April 2026
     # Sussex Green Alliance rally at Brighton Dome. ~50 counter-protesters
@@ -2122,7 +2404,7 @@ def seed_minimal():
         "climate protest activity."
     )
     a_dk.status = status_assigned
-    a_dk.assigned_to_id = test_users["user1"].id
+    # a_dk.assigned_to_id not set (Actor ID 4: unassigned)
     a_dk.first_peer_reviewer_id = test_users["user2"].id
     a_dk.tags = []
     db.session.add(a_dk)
@@ -2142,6 +2424,34 @@ def seed_minimal():
     profile_dk.sources.append(sources["Sussex Police"])
     profile_dk.labels.append(label_map["Brighton Dome Rally"])
     db.session.add(profile_dk)
+
+    # ── Media (Actor photograph — Dylan Kearney) ────────────────────
+    src_file = Path(__file__).parent / "actor4-dylan-kearney.png"
+    filename = "actor4-dylan-kearney.png"
+    filepath = media_dir / filename
+
+    if not filepath.exists() and src_file.exists():
+        shutil.copy2(src_file, filepath)
+        print(f"  Copied {filename} to media directory")
+
+    if filepath.exists():
+        etag = get_file_hash(str(filepath))
+        if not Media.query.filter(Media.etag == etag, Media.deleted.is_not(True)).first():
+            media = Media()
+            media.media_file = filename
+            media.media_file_type = "image/png"
+            media.title = "Dylan Kearney — arrested at Brighton Dome counter-protest"
+            media.comments = "Photograph of Dylan Kearney, identified at Brighton Dome counter-protest, 5 April 2026"
+            media.etag = etag
+            cat_photo = MediaCategory.query.filter_by(title="Photo").first()
+            if cat_photo:
+                media.category_id = cat_photo.id
+            media.main = True
+            media.user_id = admin.id
+            media.actor_id = a_dk.id
+            db.session.add(media)
+    elif not src_file.exists():
+        print(f"  Warning: {src_file} not found — no media attached to Dylan Kearney")
 
     # ── Bulletins ──────────────────────────────────────────────────
 
@@ -2172,7 +2482,7 @@ def seed_minimal():
     )
     b_argus.status = status_assigned
     b_argus.user_id = admin.id
-    b_argus.assigned_to_id = test_users["user2"].id
+    # b_argus.assigned_to_id not set (unassigned)
     b_argus.tags = []
     db.session.add(b_argus)
     db.session.flush()
@@ -2214,13 +2524,41 @@ def seed_minimal():
     )
     b_dome_x.status = status_assigned
     b_dome_x.user_id = admin.id
-    b_dome_x.assigned_to_id = test_users["user3"].id
+    # b_dome_x.assigned_to_id not set (unassigned)
     b_dome_x.tags = []
     db.session.add(b_dome_x)
     db.session.flush()
     b_dome_x.labels.append(label_map["Brighton Dome Rally"])
     b_dome_x.locations.append(brighton_dome)
     b_dome_x.sources.append(sources["X (Twitter)"])
+
+    # ── Media (Brighton Dome counter-protesters photo — X post) ─────────
+    src_file = Path(__file__).parent / "16-counter-protesters-dome.png"
+    filename = "16-counter-protesters-dome.png"
+    filepath = media_dir / filename
+
+    if not filepath.exists() and src_file.exists():
+        shutil.copy2(src_file, filepath)
+        print(f"  Copied {filename} to media directory")
+
+    if filepath.exists():
+        etag = get_file_hash(str(filepath))
+        if not Media.query.filter(Media.etag == etag, Media.deleted.is_not(True)).first():
+            media = Media()
+            media.media_file = filename
+            media.media_file_type = "image/png"
+            media.title = "Counter-protesters outside Brighton Dome — 5 April 2026"
+            media.comments = "X post photograph showing counter-protesters at Brighton Dome entrance with placards"
+            media.etag = etag
+            cat_photo = MediaCategory.query.filter_by(title="Photo").first()
+            if cat_photo:
+                media.category_id = cat_photo.id
+            media.main = True
+            media.user_id = admin.id
+            media.bulletin_id = b_dome_x.id
+            db.session.add(media)
+    elif not src_file.exists():
+        print(f"  Warning: {src_file} not found — no media attached to Brighton Dome bulletin")
 
     # Bulletin 3: Sussex Police statement
     b_dome_sp = Bulletin()
@@ -2248,7 +2586,7 @@ def seed_minimal():
     )
     b_dome_sp.status = status_assigned
     b_dome_sp.user_id = admin.id
-    b_dome_sp.assigned_to_id = test_users["user1"].id
+    # b_dome_sp.assigned_to_id not set (unassigned)
     b_dome_sp.tags = []
     db.session.add(b_dome_sp)
     db.session.flush()
@@ -2266,7 +2604,7 @@ def seed_minimal():
         "dispersal order. One arrest: Dylan Kearney, for obstruction."
     )
     inc_dome.status = status_assigned
-    inc_dome.assigned_to_id = test_users["user2"].id
+    # inc_dome.assigned_to_id not set (Incident ID 4: unassigned)
     inc_dome.comments = "Linked to broader Sussex Green Alliance activity. Monitor for charge/bail outcome."
     db.session.add(inc_dome)
     db.session.flush()
@@ -2344,7 +2682,7 @@ def seed_minimal():
     print(f"  Actors:     4 (Thomas Ashdown | Rachel Pemberton | Kieran Moss | Dylan Kearney)")
     print(f"  Bulletins:  17 (OVRM/2026/B/001–017, OVRM ID field set)")
     print(f"    [Lewes Castle Siege]")
-    print(f"    - Lewes Clarion: council approves Meridian House demolition — 3 Mar (assigned user1, context)")
+    print(f"    - Lewes Clarion Newspaper: council approves Meridian House demolition — 3 Mar (assigned user1, context)")
     print(f"    - X post (assigned user1)")
     print(f"    - Facebook caption (assigned user2)")
     print(f"    - Instagram caption (assigned user3)")
@@ -2357,7 +2695,7 @@ def seed_minimal():
     print(f"    - X post: Tesco Lewes car park protest (assigned user2)")
     print(f"    - Albion Broadcasting: Tesco protest mention (assigned user3)")
     print(f"    - Lewes & Weald Constabulary: criminal damage at Meridian House (assigned user3)")
-    print(f"    - Lewes Clarion: criminal damage at Meridian House (assigned user1)")
+    print(f"    - Lewes Clarion Newspaper: criminal damage at Meridian House (assigned user1)")
     print(f"    [Brighton Dome Rally]")
     print(f"    - The Argus: counter-protest at Brighton Dome (assigned user2)")
     print(f"    - X post: crowd outside Brighton Dome (assigned user3)")

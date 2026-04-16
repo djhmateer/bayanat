@@ -468,7 +468,7 @@ class TestConfig:
     AWS_REGION = "dummy_region"
 
     # Media & File Upload
-    MEDIA_ALLOWED_EXTENSIONS = ["mp4", "webm", "jpg", "gif", "png", "pdf", "doc", "txt"]
+    MEDIA_ALLOWED_EXTENSIONS = ["mp4", "webm", "jpg", "jpeg", "gif", "png", "webp", "pdf", "doc", "txt"]
     MEDIA_UPLOAD_MAX_FILE_SIZE = 1000
     SHEETS_ALLOWED_EXTENSIONS = ["csv", "xls", "xlsx"]
 

@@ -195,6 +195,7 @@
                             >${label.title}</v-chip>
                         </template>
 
+                        <!-- Access Groups template commented out
                         <template v-slot:item.roles="{item}">
                             <v-tooltip location="top" :text="role.name" v-for="role in item.roles">
                                 <template v-slot:activator="{props}">
@@ -208,6 +209,7 @@
                                 </template>
                             </v-tooltip>
                         </template>
+                        -->
 
                         <template v-slot:item.status="{ item }">
                             ${item.status}
@@ -553,7 +555,7 @@
                     {title: "{{_('Labels')}}", value: "labels", width: 200, sortable: false},
                     {% if (current_user.has_role('Admin') or current_user.has_role('DA')) %}
                         {title: "{{_('Assigned To')}}", value: "assigned_to.name", width: 130, sortable: false},
-                        {title: "{{_('Access Groups')}}", value: "roles", width: 130, sortable: false},
+                        // {title: "{{_('Access Groups')}}", value: "roles", width: 130, sortable: false},
                     {% endif %}
                     {title: "{{_('Status')}}", value: "status", width: 150, sortable: false},
                     {title: "{{_('Actions')}}", value: "action", sortable: false, width: 100}

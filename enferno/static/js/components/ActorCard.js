@@ -255,6 +255,28 @@ const ActorCard = Vue.defineComponent({
           <v-divider v-if="actor.source_link" ></v-divider>
         </v-card>
 
+        <!-- Media Section - Display at Top -->
+        <div v-if="actor.medias && actor.medias.length > 0" class="ma-2">
+          <v-card>
+            <v-toolbar density="compact">
+              <v-toolbar-title class="text-subtitle-1">{{ translations.media_ }}</v-toolbar-title>
+            </v-toolbar>
+
+            <inline-media-renderer
+              :renderer-id="mediaRendererId"
+              :media="$root.expandedByRenderer?.[mediaRendererId]?.media"
+              :media-type="$root.expandedByRenderer?.[mediaRendererId]?.mediaType"
+              @ready="$root.onMediaRendererReady"
+              @fullscreen="$root.handleFullscreen(mediaRendererId)"
+              @close="$root.closeExpandedMedia(mediaRendererId)"
+            ></inline-media-renderer>
+
+            <v-card-text>
+              <media-grid prioritize-videos :medias="actor.medias" @media-click="$root.handleExpandedMedia({ rendererId: mediaRendererId, ...$event})"></media-grid>
+            </v-card-text>
+          </v-card>
+        </div>
+
         <div class="d-flex flex-wrap">
         <template v-for="(field) in $root.cardDynamicFields('actor')">
           <div
@@ -409,29 +431,7 @@ const ActorCard = Vue.defineComponent({
             </v-card>
           </div>
 
-          <div
-            v-else-if="$root.isFieldActiveAndHasContent(field, 'medias', actor.medias)"
-            :class="$root.fieldClassDrawer(field)"
-          >
-            <v-card class="ma-2">
-              <v-toolbar density="compact">
-                <v-toolbar-title class="text-subtitle-1">{{ translations.media_ }}</v-toolbar-title>
-              </v-toolbar>
-
-              <inline-media-renderer
-                :renderer-id="mediaRendererId"
-                :media="$root.expandedByRenderer?.[mediaRendererId]?.media"
-                :media-type="$root.expandedByRenderer?.[mediaRendererId]?.mediaType"
-                @ready="$root.onMediaRendererReady"
-                @fullscreen="$root.handleFullscreen(mediaRendererId)"
-                @close="$root.closeExpandedMedia(mediaRendererId)"
-              ></inline-media-renderer>
-
-              <v-card-text>
-                <media-grid prioritize-videos :medias="actor.medias" @media-click="$root.handleExpandedMedia({ rendererId: mediaRendererId, ...$event})"></media-grid>
-              </v-card-text>
-            </v-card>
-          </div>
+          <!-- Media section moved to top -->
 
           <div
             v-else-if="$root.isFieldActiveAndHasContent(field, 'related_bulletins', actor)"
@@ -470,7 +470,7 @@ const ActorCard = Vue.defineComponent({
           </div>
 
           <div
-            v-else-if="$root.isFieldActiveAndHasContent(field, field.name, actor?.[field.name])"
+            v-else-if="field.name !== 'medias' && $root.isFieldActiveAndHasContent(field, field.name, actor?.[field.name])"
             :class="$root.fieldClassDrawer(field)"
           >
             <div v-if="Array.isArray(actor?.[field.name]) && actor?.[field.name].length">

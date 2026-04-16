@@ -21,7 +21,7 @@ admin = Blueprint(
 )
 
 # default global items per page
-PER_PAGE = 30
+PER_PAGE = 10
 REL_PER_PAGE = 5
 
 logger = get_logger()

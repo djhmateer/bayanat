@@ -9,7 +9,7 @@ from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 
 from enferno.admin.constants import Constants
-from enferno.admin.models import Bulletin, Activity, WorkflowStatus
+from enferno.admin.models import Bulletin, Activity, WorkflowStatus, Event
 from enferno.admin.models.Notification import Notification
 from enferno.admin.validation.models import (
     BulletinQueryRequestModel,
@@ -21,6 +21,7 @@ from enferno.admin.validation.models import (
 from enferno.extensions import rds, db
 from enferno.tasks import bulk_update_bulletins
 from enferno.user.models import Role
+from enferno.utils.date_helper import DateHelper
 from enferno.utils.http_response import HTTPResponse
 from enferno.utils.search_utils import SearchUtils
 from enferno.utils.validation_utils import validate_with
@@ -73,6 +74,9 @@ def api_bulletins(validated_data: dict) -> Response:
         selectinload(Bulletin.first_peer_reviewer),
         selectinload(Bulletin.roles),
         selectinload(Bulletin.labels),
+        selectinload(Bulletin.sources),
+        selectinload(Bulletin.medias),
+        selectinload(Bulletin.events).selectinload(Event.eventtype),
     )
 
     if include_count and cursor is None:
@@ -161,6 +165,23 @@ def api_bulletins(validated_data: dict) -> Response:
                     "_status": item.status,
                     "review_action": item.review_action,
                     "labels": [{"id": l.id, "title": l.title} for l in item.labels],
+                    "sources": [{"id": s.id, "title": s.title} for s in item.sources],
+                    "first_media": (
+                        {
+                            "id": item.medias[0].id,
+                            "media_url": f"/admin/api/serve/media/{item.medias[0].media_file}",
+                            "type": item.medias[0].media_file_type,
+                        }
+                        if item.medias
+                        else None
+                    ),
+                    "events": [
+                        {
+                            "id": event.id,
+                            "eventtype": event.eventtype.title if event.eventtype else None,
+                        }
+                        for event in item.events
+                    ] if item.events else [],
                 }
             )
         else:

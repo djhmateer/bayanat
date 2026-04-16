@@ -211,9 +211,12 @@ def api_medias_chunk() -> Response:
         shutil.rmtree(save_dir)
         # get md5 hash
         etag = get_file_hash(filepath)
+        logger.debug(f"Chunk upload completed: {filename}, etag={etag}, size={os.stat(filepath).st_size}")
 
         # validate etag here // if it exists // reject the upload and send an error code
-        if Media.query.filter(Media.etag == etag, Media.deleted == False).first():
+        existing_media = Media.query.filter(Media.etag == etag, Media.deleted == False).first()
+        if existing_media:
+            logger.warning(f"409 Conflict: File already exists. etag={etag}, existing_media_id={existing_media.id}, user={current_user.id}")
             return HTTPResponse.error("Error, file already exists", status=409)
 
         if not current_app.config["FILESYSTEM_LOCAL"] and not import_upload:
@@ -275,8 +278,11 @@ def api_medias_upload() -> Response:
             file.save(f)
         # get md5 hash
         etag = get_file_hash(filepath)
+        logger.debug(f"Local upload: {filename}, etag={etag}")
         # check if file already exists
-        if Media.query.filter(Media.etag == etag, Media.deleted == False).first():
+        existing_media = Media.query.filter(Media.etag == etag, Media.deleted == False).first()
+        if existing_media:
+            logger.warning(f"409 Conflict: File already exists (local). etag={etag}, existing_media_id={existing_media.id}, user={current_user.id}")
             return HTTPResponse.error("Error: File already exists", status=409)
 
         response = {"etag": etag, "filename": filename}
@@ -299,9 +305,12 @@ def api_medias_upload() -> Response:
         # response (wrapped in quotes per the S3 protocol). Reading it directly avoids
         # an extra GetObject round trip that would otherwise stream the entire file back.
         etag = obj.e_tag.strip('"')
+        logger.debug(f"S3 upload: {filename}, etag={etag}")
 
         # check if file already exists
-        if Media.query.filter(Media.etag == etag, Media.deleted == False).first():
+        existing_media = Media.query.filter(Media.etag == etag, Media.deleted == False).first()
+        if existing_media:
+            logger.warning(f"409 Conflict: File already exists (S3). etag={etag}, existing_media_id={existing_media.id}, user={current_user.id}")
             return HTTPResponse.error("Error: File already exists", status=409)
 
         return HTTPResponse.success(data={"filename": filename, "etag": etag})

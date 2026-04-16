@@ -82,6 +82,7 @@ def api_actors(validated_data: dict) -> Response:
         selectinload(Actor.first_peer_reviewer),
         selectinload(Actor.roles),
         selectinload(Actor.actor_profiles).selectinload(ActorProfile.labels),
+        selectinload(Actor.medias),
     )
 
     if include_count and cursor is None:
@@ -176,6 +177,15 @@ def api_actors(validated_data: dict) -> Response:
                     "_status": item.status,
                     "review_action": item.review_action,
                     "labels": list({l.id: {"id": l.id, "title": l.title} for p in item.actor_profiles for l in p.labels}.values()),
+                    "first_media": (
+                        {
+                            "id": item.medias[0].id,
+                            "media_url": f"/admin/api/serve/media/{item.medias[0].media_file}",
+                            "type": item.medias[0].media_file_type,
+                        }
+                        if item.medias
+                        else None
+                    ),
                 }
             )
         else:

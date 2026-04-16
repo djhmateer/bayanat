@@ -48,6 +48,20 @@
                             </v-btn>
                         </v-btn-toggle>
 
+                        <!-- Actor Media Display -->
+                        <div v-if="editedItem.medias && editedItem.medias.length > 0" class="mt-4 mb-6 px-3">
+                            <h3 class="text-subtitle2 mb-3">{{ _('Media') }}</h3>
+                            <div style="max-width: 200px;">
+                                <img v-if="editedItem.medias[0].media_file_type?.startsWith('image')"
+                                    :src="`/admin/api/serve/media/${editedItem.medias[0].media_file}`"
+                                    :alt="'Media for actor ' + editedItem.id"
+                                    style="max-width: 100%; height: auto; border-radius: 4px;"
+                                />
+                                <v-icon v-else-if="editedItem.medias[0].media_file_type?.startsWith('video')" size="80" color="primary">mdi-play-circle</v-icon>
+                                <v-icon v-else size="80" color="primary">mdi-file</v-icon>
+                            </div>
+                        </div>
+
                         <div v-if="movableDynamicFields({ entityType: 'actor' }).length" class="form-grid mt-4">
                             <template v-for="(field, index) in movableDynamicFields({ entityType: 'actor' })" :key="field.id">
                                 <div v-if="isFieldActive(field, 'name') && editedItem.type === 'Entity'" :class="[fieldClass(field), 'px-3 py-2']">
@@ -913,7 +927,7 @@
                         <div v-if="fixedDynamicFields({ entityType: 'actor' }).length" class="form-grid mt-4">
                             <template v-for="(field, index) in fixedDynamicFields({ entityType: 'actor' })" :key="field.id">
                                 <div v-if="isFieldActive(field, 'comments')" :class="fieldClass(field)">
-                                    <v-textarea required class="h-100" :rules="[validationRules.required()]" outlined v-model="editedItem.comments"
+                                    <v-textarea class="h-100" outlined v-model="editedItem.comments"
                                         label="{{ _('Comments') }}"
                                         v-bind="serverErrorPropsForField(serverErrors, 'item.comments')"
                                     ></v-textarea>

@@ -246,7 +246,7 @@ class BulletinValidationModel(StrictValidationModel):
     assigned_to: Optional[PartialUserModel] = None
     first_peer_reviewer: Optional[PartialUserModel] = None
     description: Optional[SanitizedField] = None
-    comments: str = Field(min_length=1)
+    comments: Optional[str] = None
     source_link: str = Field(min_length=1)
     source_link_type: Optional[bool] = None
     tags: Optional[list[str]] = Field(default_factory=list)
@@ -356,7 +356,7 @@ class IncidentValidationModel(StrictValidationModel):
     actor_relations: list[PartialItoaModel] = Field(default_factory=list)
     bulletin_relations: list[PartialItobModel] = Field(default_factory=list)
     incident_relations: list[PartialItoiModel] = Field(default_factory=list)
-    comments: str = Field(min_length=1)
+    comments: Optional[str] = None
     status: Optional[str] = None
 
     # Below fields are sent by the front-end, dismissed by `from_json`
@@ -707,7 +707,7 @@ class ActorValidationModel(StrictValidationModel):
     actor_relations: list[PartialAtoaModel] = Field(default_factory=list)
     bulletin_relations: list[PartialAtobModel] = Field(default_factory=list)
     incident_relations: list[PartialAtoiModel] = Field(default_factory=list)
-    comments: str = Field(min_length=1)  # type: ignore
+    comments: Optional[str] = None
     status: Optional[str] = DEFAULT_STRING_FIELD
     actor_profiles: list[PartialActorProfileModel] = Field(default_factory=list)
     tags: list[str] = Field(default_factory=list)

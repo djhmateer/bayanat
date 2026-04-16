@@ -62,8 +62,10 @@
     "mp4",
     "webm",
     "jpg",
+    "jpeg",
     "gif",
     "png",
+    "webp",
     "pdf",
     "doc",
     "txt"
