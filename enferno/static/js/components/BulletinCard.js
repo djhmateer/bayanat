@@ -126,13 +126,26 @@ const BulletinCard = Vue.defineComponent({
             {{ translations.id_ }} {{ bulletin.id }}
           </v-chip>
 
+          <v-tooltip v-if="bulletin.case_reference" location="bottom">
+              <template v-slot:activator="{ props }">
+                  <v-chip
+                      v-bind="props"
+                      prepend-icon="mdi-file-document-outline"
+                      label
+                      class="ml-1">
+                      {{ bulletin.case_reference }}
+                  </v-chip>
+              </template>
+              Case Reference
+          </v-tooltip>
+
           <v-tooltip v-if="bulletin.originid" location="bottom">
               <template v-slot:activator="{ props }">
-                  <v-chip 
+                  <v-chip
                       v-bind="props"
-                      prepend-icon="mdi-identifier" 
-                      :href="bulletin.source_link" 
-                      target="_blank" 
+                      prepend-icon="mdi-identifier"
+                      :href="bulletin.source_link"
+                      target="_blank"
                       label
                       append-icon="mdi-open-in-new"
                       class="ml-1">
@@ -376,7 +389,7 @@ const BulletinCard = Vue.defineComponent({
             </div>
 
             <div v-else-if="$root.isFieldActiveAndHasContent(field, 'publish_date', bulletin.publish_date)" :class="$root.fieldClassDrawer(field)">
-              <uni-field :caption="translations.publishDate_" :english="$root.formatDate(bulletin.publish_date)"></uni-field>
+              <uni-field :caption="translations.publishDate_" :english="$root.formatDate(bulletin.publish_date, $root.dateFormats.standardDate)"></uni-field>
             </div>
 
             <div v-else-if="$root.isFieldActiveAndHasContent(field, 'documentation_date', bulletin.documentation_date)" :class="$root.fieldClassDrawer(field)">

@@ -143,6 +143,8 @@ def api_bulletins(validated_data: dict) -> Response:
                     "title_ar": item.title_ar,
                     "sjac_title": item.sjac_title,
                     "sjac_title_ar": item.sjac_title_ar,
+                    "case_reference": item.case_reference,
+                    "publish_date": item.publish_date.isoformat() if item.publish_date else None,
                     "status": item.status,
                     "assigned_to": (
                         {"id": item.assigned_to.id, "name": item.assigned_to.name}
@@ -165,6 +167,7 @@ def api_bulletins(validated_data: dict) -> Response:
                     "_status": item.status,
                     "review_action": item.review_action,
                     "labels": [{"id": l.id, "title": l.title} for l in item.labels],
+                    "originid": item.originid,
                     "sources": [{"id": s.id, "title": s.title} for s in item.sources],
                     "first_media": (
                         {

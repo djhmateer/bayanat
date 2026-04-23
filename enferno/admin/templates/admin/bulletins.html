@@ -246,6 +246,12 @@
                             </div>
                         </template>
 
+                        <template #item.publish_date="{item}">
+                            <span v-if="item.publish_date">
+                                ${ new Date(item.publish_date).toLocaleDateString('en-GB') }
+                            </span>
+                        </template>
+
                         <!-- TODO: Access Groups column - commented out but can be easily restored
                         <template #item.roles="{item}">
                             <v-tooltip location="top" :text="role.name" v-for="role in item.roles">
@@ -697,12 +703,14 @@
 
 
                     headers: [
-                        {title: "{{_('ID')}}", value: "id", width: 12, sortable: true},
-                        {title: "{{_('Title')}}", value: "title", width: 300, sortable: false},
+                        {title: "{{_('Global Content Reference')}}", value: "case_reference", width: 100, sortable: false},
+                        {title: "{{_('Title')}}", value: "sjac_title", width: 300, sortable: false},
                         {title: "{{_('Media')}}", value: "first_media", width: 160, sortable: false},
                         {title: "{{_('Event Type')}}", value: "first_event", width: 150, sortable: false},
-                        {title: "{{_('Sources')}}", value: "sources", width: 200, sortable: false},
+                        {title: "{{_('Platform')}}", value: "sources", width: 200, sortable: false},
+                        {title: "{{_('Account Source')}}", value: "originid", width: 130, sortable: false},
                         {title: "{{_('Investigation')}}", value: "labels", width: 200, sortable: false},
+                        {title: "{{_('Publish Date')}}", value: "publish_date", width: 120, sortable: false},
 
                         {% if (current_user.has_role('Admin') or current_user.has_role('DA')) %}
                             {title: "{{_('Assigned To')}}", value: "assigned_to.name", width: 130, sortable: false},
@@ -751,7 +759,7 @@
 
                     reviewItem: {},
 
-                    unrestricted: false,
+                    unrestricted: true,
 
                     // bulk actions
                     bulk: {},
@@ -1657,7 +1665,7 @@
                         setTimeout(() => {
                             this.editedItem = Object.assign({}, this.defaultItem);
 
-                            this.unrestricted = false;
+                            this.unrestricted = true;
                             this.editedIndex = -1;
                             this.saving = false;
                             this.serverErrors = {}

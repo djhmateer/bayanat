@@ -176,6 +176,7 @@ def api_actors(validated_data: dict) -> Response:
                     ),
                     "_status": item.status,
                     "review_action": item.review_action,
+                    "id_number": item.id_number,
                     "labels": list({l.id: {"id": l.id, "title": l.title} for p in item.actor_profiles for l in p.labels}.values()),
                     "first_media": (
                         {

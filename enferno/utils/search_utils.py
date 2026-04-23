@@ -400,8 +400,11 @@ class SearchUtils:
             if words:
                 # Store for OCR match detection (used by get_ocr_matched_ids)
                 self.tsv_words = words
-                # Fast path: bulletin.search - individual ILIKEs enable GIN trigram index (200x faster)
-                bulletin_conditions = [Bulletin.search.ilike(f"%{word}%") for word in words]
+                # Fast path: bulletin.search + case_reference - individual ILIKEs enable GIN trigram index (200x faster)
+                bulletin_conditions = [
+                    or_(Bulletin.search.ilike(f"%{word}%"), Bulletin.case_reference.ilike(f"%{word}%"))
+                    for word in words
+                ]
 
                 # Execute OCR query once and cache matching bulletin IDs
                 # This avoids running the expensive ILIKE scan as a subquery inside OR

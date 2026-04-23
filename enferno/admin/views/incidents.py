@@ -9,7 +9,8 @@ from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 
 from enferno.admin.constants import Constants
-from enferno.admin.models import Incident, Activity, WorkflowStatus
+from enferno.admin.models import Incident, Activity, WorkflowStatus, Bulletin
+from enferno.admin.models.Itob import Itob
 from enferno.admin.models.Notification import Notification
 from enferno.admin.validation.models import (
     IncidentQueryRequestModel,
@@ -57,6 +58,23 @@ def incidents(id: Optional[t.id]) -> str:
     )
 
 
+def _first_bulletin_media(incident):
+    """Return the first image (or video if no image) from any related bulletin."""
+    video = None
+    for rel in incident.related_bulletins:
+        b = rel.bulletin
+        if not b or not b.medias:
+            continue
+        for m in b.medias:
+            if m.media_file_type and m.media_file_type.startswith("image"):
+                return {"id": m.id, "media_url": f"/admin/api/serve/media/{m.media_file}", "type": m.media_file_type}
+            if video is None and m.media_file_type and m.media_file_type.startswith("video"):
+                video = m
+    if video:
+        return {"id": video.id, "media_url": f"/admin/api/serve/media/{video.media_file}", "type": video.media_file_type}
+    return None
+
+
 @admin.route("/api/incidents/", methods=["POST", "GET"])
 @validate_with(IncidentQueryRequestModel)
 def api_incidents(validated_data: dict) -> Response:
@@ -90,6 +108,7 @@ def api_incidents(validated_data: dict) -> Response:
         selectinload(Incident.first_peer_reviewer),
         selectinload(Incident.roles),
         selectinload(Incident.labels),
+        selectinload(Incident.related_bulletins).selectinload(Itob.bulletin).selectinload(Bulletin.medias),
     )
 
     if include_count and cursor is None:
@@ -184,6 +203,7 @@ def api_incidents(validated_data: dict) -> Response:
                     "_status": item.status,
                     "review_action": item.review_action,
                     "labels": [{"id": l.id, "title": l.title} for l in item.labels],
+                    "first_media": _first_bulletin_media(item),
                 }
             )
         else:

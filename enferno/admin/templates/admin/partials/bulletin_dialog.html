@@ -23,6 +23,20 @@
             >
                 <v-toolbar-title>${formTitle} <span class="gv--text" v-if="editedItem.id"> ${editedItem.id}</span>
 
+                    <v-tooltip v-if="editedItem.case_reference" location="bottom">
+                        <template v-slot:activator="{ props }">
+                            <v-chip
+                                v-bind="props"
+                                prepend-icon="mdi-file-document-outline"
+                                pill
+                                label
+                                class="white--text ml-2">
+                                ${editedItem.case_reference}
+                            </v-chip>
+                        </template>
+                        {{ _('Global Content Reference') }}
+                    </v-tooltip>
+
                     <v-tooltip v-if="editedItem.originid" location="bottom">
                         <template v-slot:activator="{ props }">
                             <v-chip 
@@ -96,6 +110,12 @@
                                             v-bind="serverErrorPropsForDualField(serverErrors, 'item.sjac_title', 'item.sjac_title_ar')"
                                         ></dual-field>
                                     </div>
+                                    <div v-else-if="isFieldActive(field, 'case_reference')" :class="[fieldClass(field), 'px-3 py-2']">
+                                        <v-text-field v-model="editedItem.case_reference" label="{{ _('Global Content Reference') }}"
+                                            :rules="[validationRules.maxLength(50)]"
+                                            v-bind="serverErrorPropsForField(serverErrors, 'item.case_reference')"
+                                        ></v-text-field>
+                                    </div>
                                     <div v-else-if="isFieldActive(field, 'tags')" :class="[fieldClass(field), 'px-3 py-2']">
                                         <v-combobox chips multiple v-model="editedItem.tags" label="{{ _('Tags') }}"></v-combobox>
                                     </div>
@@ -132,8 +152,8 @@
                                         <global-map  ref="globalmap" :model-value="compLocations"></global-map>
                                     </div>
                                     <div v-else-if="isFieldActive(field, 'publish_date')" :class="[fieldClass(field), 'px-3 py-2']">
-                                        <pop-date-time-field time-label="{{ _('Time') }}" label="{{ _('Publish Date') }}"
-                                            v-model="editedItem.publish_date"></pop-date-time-field>
+                                        <pop-date-field label="{{ _('Publish Date') }}"
+                                            v-model="editedItem.publish_date"></pop-date-field>
                                     </div>
                                     <div v-else-if="isFieldActive(field, 'documentation_date')" :class="[fieldClass(field), 'px-3 py-2']">
                                         <pop-date-time-field time-label="{{ _('Time') }}" label="{{ _('Documentation Date') }}"

@@ -232,6 +232,14 @@
                             </v-tooltip>
                         </template>
 
+                        <template #item.id_numbers="{item}">
+                            <div v-if="item.id_number && item.id_number.length">
+                                <div v-for="id in item.id_number" :key="id.number" class="text-caption">
+                                    ${id.number}
+                                </div>
+                            </div>
+                        </template>
+
                         <template #item.first_media="{item}">
                             <div v-if="item.first_media" style="width: 120px; height: 120px; padding: 2px; display: flex; align-items: center; justify-content: center; overflow: hidden; border-radius: 4px;">
                                 <img v-if="item.first_media.type?.startsWith('image')"
@@ -635,6 +643,7 @@
                     {title: "{{_('ID')}}", value: "id", width: 12, sortable: false},
                     {title: "{{_('Type')}}", value: "type", width: 20, sortable: false},
                     {title: "{{_('Name')}}", value: "name", width: 300, sortable: false},
+                    {title: "{{_('Soldier ID')}}", value: "id_numbers", width: 120, sortable: false},
                     {title: "{{_('Media')}}", value: "first_media", width: 160, sortable: false},
                     {title: "{{_('Labels')}}", value: "labels", width: 200, sortable: false},
                     {% if (current_user.has_role('Admin') or current_user.has_role('DA')) %}
@@ -684,7 +693,7 @@
 
                 reviewItem: {},
 
-                unrestricted: false,
+                unrestricted: true,
 
                 // bulk actions
                 bulk: {},
@@ -1664,7 +1673,7 @@
                     setTimeout(() => {
                         this.editedItem = Object.assign({}, this.defaultItem);
                         this.editedIndex = -1;
-                        this.unrestricted = false;
+                        this.unrestricted = true;
                         this.saving = false;
                         this.serverErrors = {}
                     }, 300);

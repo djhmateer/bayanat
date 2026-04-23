@@ -29,6 +29,9 @@ class Source(db.Model, BaseMixin):
     source_type = db.Column(db.String)
     comments = db.Column(db.Text)
     comments_ar = db.Column(db.Text)
+    url = db.Column(db.String)
+    locked = db.Column(db.Boolean, default=False)
+    account_focus = db.Column(db.String)
     parent_id = db.Column(db.Integer, db.ForeignKey("source.id"), index=True)
     parent = db.relationship("Source", remote_side=id, backref="sub_source")
 
@@ -40,6 +43,12 @@ class Source(db.Model, BaseMixin):
             self.comments = json["comments"]
         if "comments_ar" in json:
             self.comments = json["comments_ar"]
+        if "url" in json:
+            self.url = json["url"] or None
+        if "locked" in json:
+            self.locked = bool(json["locked"])
+        if "account_focus" in json:
+            self.account_focus = json["account_focus"] or None
         parent = json.get("parent")
         if parent:
             parent_id = parent.get("id")
@@ -64,6 +73,9 @@ class Source(db.Model, BaseMixin):
             "etl_id": self.etl_id,
             "parent": {"id": self.parent.id, "title": self.parent.title} if self.parent else None,
             "comments": self.comments,
+            "url": self.url,
+            "locked": self.locked or False,
+            "account_focus": self.account_focus,
             "updated_at": (
                 DateHelper.serialize_datetime(self.updated_at) if self.updated_at else None
             ),
@@ -168,8 +180,52 @@ class Source(db.Model, BaseMixin):
         tmp = NamedTemporaryFile().name
         file_storage.save(tmp)
         df = pd.read_csv(tmp)
-        df.comments = df.comments.fillna("")
-        db.session.bulk_insert_mappings(Source, df.to_dict(orient="records"))
+        df.columns = [c.lower() for c in df.columns]
+
+        logger.info(f"Source CSV import: {len(df)} rows, columns: {list(df.columns)}")
+
+        # Truncate existing sources before re-import
+        db.session.execute(text("TRUNCATE TABLE source RESTART IDENTITY CASCADE"))
+        db.session.commit()
+        logger.info("Source table truncated")
+
+        # Keep only columns that exist on the Source table
+        valid_cols = {c.name for c in Source.__table__.columns}
+        extra_cols = [c for c in df.columns if c not in valid_cols]
+        if extra_cols:
+            logger.warning(f"Ignoring unrecognised CSV columns: {extra_cols}")
+        df = df[[c for c in df.columns if c in valid_cols]]
+
+        # Drop rows with no title
+        if "title" in df.columns:
+            before = len(df)
+            df = df[df.title.notna() & (df.title.astype(str).str.strip() != "")]
+            dropped = before - len(df)
+            if dropped:
+                logger.warning(f"Dropped {dropped} rows with missing title")
+
+        # Normalise nullable fields
+        if "comments" in df.columns:
+            df.comments = df.comments.fillna("")
+        if "url" in df.columns:
+            df.url = df.url.where(df.url.notna(), None)
+        if "locked" in df.columns:
+            df.locked = df.locked.fillna(False).astype(bool)
+
+        logger.info(f"Attempting to insert {len(df)} rows after filtering")
+
+        # Insert row-by-row using savepoints so a single bad row doesn't abort others
+        imported = 0
+        skipped = 0
+        for i, record in enumerate(df.to_dict(orient="records")):
+            try:
+                with db.session.begin_nested():
+                    db.session.execute(Source.__table__.insert().values(**record))
+                imported += 1
+            except Exception as e:
+                skipped += 1
+                logger.error(f"Row {i+1} skipped — {type(e).__name__}: {e} | data: {record}")
+
         db.session.commit()
 
         # reset id sequence counter
@@ -177,4 +233,5 @@ class Source(db.Model, BaseMixin):
         db.session.execute(text("alter sequence source_id_seq restart with :m"), {"m": max_id})
         db.session.commit()
 
-        return ""
+        logger.info(f"Source import complete: {imported} inserted, {skipped} skipped")
+        return f"Imported {imported} sources ({skipped} skipped)"

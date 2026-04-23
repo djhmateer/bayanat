@@ -880,6 +880,8 @@ class SourceValidationModel(StrictValidationModel):
     title_ar: Optional[str] = None
     comments: Optional[str] = None
     comments_ar: Optional[str] = None
+    url: Optional[str] = None
+    locked: Optional[bool] = None
     parent: Optional[PartialSourceModel] = None
     # sent by the front-end on PUT, but not used by the from_json method
     id: Optional[int] = None

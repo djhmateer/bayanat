@@ -82,6 +82,20 @@
                                                                     </v-col>
                                                                 </v-row>
                                                                 <v-row>
+                                                                    <v-col cols="12" md="10">
+                                                                        <v-text-field
+                                                                                v-model="editedItem.url"
+                                                                                label="{{ _('URL') }}"
+                                                                        ></v-text-field>
+                                                                    </v-col>
+                                                                    <v-col cols="12" md="2" class="d-flex align-center">
+                                                                        <v-checkbox
+                                                                                v-model="editedItem.locked"
+                                                                                label="{{ _('Locked') }}"
+                                                                        ></v-checkbox>
+                                                                    </v-col>
+                                                                </v-row>
+                                                                <v-row>
 
                                                                     <v-col cols="12" md="12">
                                                                         <v-textarea
@@ -218,7 +232,9 @@
                     {title: "{{('ID')}}", value: "id"},
                     {title: "{{_('Title')}}", value: "title"},
                     {title: "{{_('Origin ID')}}", value: "etl_id"},
-
+                    {title: "{{_('URL')}}", value: "url"},
+                    {title: "{{_('Locked')}}", value: "locked"},
+                    {title: "{{_('Account Focus')}}", value: "account_focus"},
                     {title: "{{_('Comments')}}", value: "comments"},
                     {title: "{{_('Parent')}}", value: "parent.title"},
 

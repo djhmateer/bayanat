@@ -63,6 +63,7 @@ class Bulletin(db.Model, BaseMixin):
     description = db.Column(db.Text)
 
     reliability_score = db.Column(db.Integer, default=0)
+    case_reference = db.Column(db.String(50), index=True)
 
     first_peer_reviewer_id = db.Column(db.Integer, db.ForeignKey("user.id"), index=True)
     second_peer_reviewer_id = db.Column(db.Integer, db.ForeignKey("user.id"), index=True)
@@ -783,6 +784,7 @@ class Bulletin(db.Model, BaseMixin):
                 "title_ar": self.title_ar,
                 "sjac_title": self.sjac_title or None,
                 "sjac_title_ar": self.sjac_title_ar or None,
+                "case_reference": self.case_reference or None,
                 "originid": self.originid or None,
                 # assigned to
                 "assigned_to": self.assigned_to.to_compact() if self.assigned_to else None,

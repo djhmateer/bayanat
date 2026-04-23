@@ -174,6 +174,7 @@ WantedBy=multi-user.target
 # had to change to 0.0.0.0 from 127.0.0.1 to access from test server
 sudo systemctl enable --now bayanat.service
 sudo systemctl disable bayanat.service
+sudo systemctl stop bayanat.service
 sudo systemctl status bayanat.service
 
 
@@ -237,6 +238,8 @@ ExecStart=/bayanat/.venv/bin/celery  -A enferno.tasks worker --autoscale 2,5 -B
 WantedBy=multi-user.target
 
 sudo systemctl enable --now bayanat-celery.service
+sudo systemctl disable --now bayanat-celery.service
+sudo systemctl stop --now bayanat-celery.service
 
 
 ## TO RECREATE
@@ -276,12 +279,36 @@ uv run flask import-data
 
 uv sync --upgrade     
 
+uv lock --upgrade
+
 uv run flask run
 
-uv run python sample_data/sample_data_minimal_reset.py
+# uv run python sample_data/sample_data_minimal_reset.py
+uv run python secrets/25006/reset_db_for_25006.py
 
 # so can run bulk updates
 uv run celery -A enferno.tasks worker -B --loglevel=info
 
 # run migrations
 uv run flask db upgrade 
+
+
+## 25-006
+
+# on dev postgres 18.3-1
+sudo -u postgres psql
+
+DROP DATABASE bayanat;
+CREATE database bayanat;
+\c bayanat
+CREATE EXTENSION if not exists pg_trgm; CREATE EXTENSION if not exists postgis;
+
+# setup_complete to false
+vim config.json
+
+uv run flask create-db
+
+uv run flask run
+
+
+
