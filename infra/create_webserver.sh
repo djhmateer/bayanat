@@ -80,6 +80,7 @@ git clone https://github.com/djhmateer/bayanat.git /bayanat/
 # install uv.. 
 # same command to update
 # 0.10.11 on 17th Mar 2026
+# 0.11.7 on 23rd Apr 2026
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
 source $HOME/.local/bin/env
@@ -310,5 +311,32 @@ uv run flask create-db
 
 uv run flask run
 
+## PROD Deploy
 
+sudo -u bayanat -i
+cd /bayanat
 
+sudo systemctl enable --now bayanat-celery.service
+sudo systemctl disable --now bayanat-celery.service
+sudo systemctl stop --now bayanat-celery.service
+
+# there is a uwsgi.ini file in the bayanat directory already
+# had to change to 0.0.0.0 from 127.0.0.1 to access from test server
+sudo systemctl enable --now bayanat.service
+sudo systemctl disable bayanat.service
+sudo systemctl stop bayanat.service
+sudo systemctl status bayanat.service
+
+psql
+\c bayanat
+DROP DATABASE bayanat;
+CREATE DATABASE bayanat;
+
+sudo -u postgres psql -d bayanat -c 'CREATE EXTENSION if not exists pg_trgm; CREATE EXTENSION if not exists postgis;'
+
+uv run flask create-db  
+
+# maybe had to change the uwsgi.ini file?
+uv run flask run --host=0.0.0.0
+
+# run migrations

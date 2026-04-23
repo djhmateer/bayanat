@@ -93,7 +93,7 @@ def upgrade():
     # 5. Create per-entity partial unique indexes
     op.execute(
         """
-        CREATE UNIQUE INDEX ix_media_etag_bulletin_unique
+        CREATE UNIQUE INDEX IF NOT EXISTS ix_media_etag_bulletin_unique
         ON media (etag, bulletin_id)
         WHERE deleted = FALSE AND bulletin_id IS NOT NULL
     """
@@ -101,7 +101,7 @@ def upgrade():
 
     op.execute(
         """
-        CREATE UNIQUE INDEX ix_media_etag_actor_unique
+        CREATE UNIQUE INDEX IF NOT EXISTS ix_media_etag_actor_unique
         ON media (etag, actor_id)
         WHERE deleted = FALSE AND actor_id IS NOT NULL
     """
