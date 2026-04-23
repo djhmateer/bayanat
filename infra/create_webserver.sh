@@ -340,3 +340,6 @@ uv run flask create-db
 uv run flask run --host=0.0.0.0
 
 # run migrations
+ uv run flask db upgrade
+
+uv run python secrets/25006/reset_db_for_25006.py
